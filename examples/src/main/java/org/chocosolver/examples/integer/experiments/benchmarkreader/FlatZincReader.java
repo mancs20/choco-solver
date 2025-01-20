@@ -7,6 +7,7 @@ import org.chocosolver.parser.flatzinc.ast.Datas;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
+import org.chocosolver.solver.variables.Variable;
 
 import static java.lang.System.exit;
 
@@ -44,7 +45,7 @@ public class FlatZincReader extends BenchamarkReader{
                 }else if(datas[0].get("DECISION_VARS") != null) {
                     decisionVariables = (IntVar[]) datas[0].get("DECISION_VARS");
                 }else{
-                    System.out.println("If you want to access the decision variables, you need to group them in an array or set" +
+                    System.out.println("If you want to access the decision variables, you need to group them in an array or set " +
                             "called decision_vars or DECISION_VARS in the minizinc model file");
                 }
 
@@ -59,6 +60,7 @@ public class FlatZincReader extends BenchamarkReader{
                             "called maximization or minimization in the minizinc model file. Check that only one of them is present.");
                     System.exit(1);
                 }
+                setMaxMinTrue(model, datas);
                 mov = new ModelObjectivesVariables(model, objectives, decisionVariables, maximization);
                 return mov;
             }else{
@@ -70,5 +72,15 @@ public class FlatZincReader extends BenchamarkReader{
             exit(1);
         }
         return mov;
+    }
+
+    private void setMaxMinTrue(Model model, Datas[] datas) {
+        Variable[] outPutVars = datas[0].allOutPutVars();
+        for (int i = 0; i < outPutVars.length; i++) {
+            if (outPutVars[i].getName().equals("maximization") || outPutVars[i].getName().equals("minimization")) {
+                model.arithm(outPutVars[i].asIntVar(), "=", 1).post();
+                break;
+            }
+        }
     }
 }

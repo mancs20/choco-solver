@@ -5,7 +5,7 @@ import java.time.format.DateTimeFormatter;
 
 public class Config {
     private final String benchmark;
-    private final String problem;
+    private String problem;
     private final String instance;
     private final String instancePath;
     private final String modelName;
@@ -38,6 +38,9 @@ public class Config {
 
     public String getInstance() {
         return instance;
+    }
+    public void setProblem(String problem) {
+        this.problem = problem;
     }
 
     public String getModelName() {

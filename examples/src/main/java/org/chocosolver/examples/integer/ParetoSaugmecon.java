@@ -1,5 +1,6 @@
 package org.chocosolver.examples.integer;
 
+import org.chocosolver.examples.integer.experiments.frontgenerators.TimeoutHolder;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.Solver;
@@ -9,7 +10,7 @@ import org.chocosolver.solver.variables.IntVar;
 import java.util.*;
 import java.util.stream.Stream;
 
-public class ParetoSaugmecon {
+public class ParetoSaugmecon implements TimeoutHolder {
     private Constraint[] constraintObjectives;
     private int[] bestObjectiveValues;
     private Solution[] bestObjectiveValuesSolution;
@@ -24,13 +25,14 @@ public class ParetoSaugmecon {
     private boolean stopCriterionReached;
     private boolean performLexicographicOptimization;
     private boolean cannotUseSaugmeconObjective;
+    protected long startTimeNano;
 
     public ParetoSaugmecon(boolean performLexicographicOptimization) {
         this.performLexicographicOptimization = performLexicographicOptimization;
     }
 
     public Object[] run(Model model, IntVar[] objectives, boolean maximize, int timeout) {
-        long startTime = System.nanoTime();
+        startTimeNano = System.nanoTime();
         this.timeout = timeout;
         this.model = model;
         solver = this.model.getSolver();
@@ -40,6 +42,7 @@ public class ParetoSaugmecon {
         // Get the best value for each objective (maximization)
         getObjectivesOptimalValues();
         getNadirObjectiveValues();
+        List<Solution> allSolutions = null;
         if (!stopCriterionReached){
             // Add the saugmecon objective
             setSaugmeconObjective();
@@ -61,6 +64,7 @@ public class ParetoSaugmecon {
             Set<String> previousSolutions = new HashSet<>();
             List<SolutionEfArrayInformation> previousSolutionInformation = new ArrayList<>();
             saugmeconLoop(efArray, rwv, bestObjectiveValues.length, previousSolutionInformation, previousSolutions);
+            allSolutions = new ArrayList<>(solutions);
             // remove the solutions that are dominated by the front
             if (!performLexicographicOptimization && (cannotUseSaugmeconObjective || objectives.length > 2)){
                 for (int i = solutions.size()-1; i > -1; i--) {
@@ -94,15 +98,19 @@ public class ParetoSaugmecon {
                 }
             }
         }else{
+            allSolutions = new ArrayList<>();
             for (int i = 0; i < bestObjectiveValues.length; i++) {
                 if (bestObjectiveValuesSolution[i] != null) {
                     solutions.add(bestObjectiveValuesSolution[i]);
                 }
             }
         }
-        long endTime = System.nanoTime();
-        float elapsedTime = (float) (endTime - startTime) / 1_000_000_000;
-        return new Object[]{solutions, recorderList, elapsedTime};
+        for (int i = 0; i < bestObjectiveValues.length; i++) {
+            if (bestObjectiveValuesSolution[i] != null) {
+                allSolutions.add(i, bestObjectiveValuesSolution[i]);
+            }
+        }
+        return new Object[]{solutions, recorderList, allSolutions};
     }
 
     private void saugmeconLoop(int[] efArray, int[] rwv, int idObjective,
@@ -293,11 +301,11 @@ public class ParetoSaugmecon {
     }
 
     private Solution optimizeIntVar(IntVar objective, boolean maximize, boolean saveStats, boolean optimizeSaugmeconObjective) {
+        timeout = updateSolverTimeoutCurrentTime(solver, timeout, startTimeNano);
         Solution solution = null;
         if (timeout <= 0) {
             stopCriterionReached = true;
         }else{
-            solver.limitTime(timeout + "s");
             if (!solver.isStopCriterionMet()) {
                 if (optimizeSaugmeconObjective && cannotUseSaugmeconObjective){
                     if (performLexicographicOptimization){
@@ -314,7 +322,11 @@ public class ParetoSaugmecon {
                     recorderList.add(solver.getMeasures().toString());
                 }
                 if (!solver.isStopCriterionMet()){
-                    solver.reset();
+                    if (solution != null){
+                        solver.hardReset();
+                    }else{
+                        solver.reset();
+                    }
                 }else {
                     stopCriterionReached = true;
                 }

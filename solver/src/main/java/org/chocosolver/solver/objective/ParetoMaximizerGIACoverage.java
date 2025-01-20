@@ -9,48 +9,23 @@
  */
 package org.chocosolver.solver.objective;
 
-import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
-import org.chocosolver.solver.constraints.Propagator;
 import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.search.ParetoFeasibleRegion;
-import org.chocosolver.solver.search.loop.monitors.IMonitorSolution;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.ESat;
 
-import java.util.List;
 
-/**
- * Class to store the pareto front (multi-objective optimization).
- * <p>
- * Based on "Multi-Objective Large Neighborhood Search", P. Schaus , R. Hartert (CP'2013)
- * </p>
- *
- * @author Charles Vernerey
- * @author Charles Prud'homme
- * @author Jean-Guillaume Fages
- * @author Jani Simomaa
- */
-public class ParetoMaximizerImproveAllObjectives extends Propagator<IntVar> implements IMonitorSolution {
+public class ParetoMaximizerGIACoverage extends ParetoMaximizerGIAGeneral {
 
     //***********************************************************************************
     // VARIABLES
     //***********************************************************************************
-    // objective function
-    private final IntVar[] objectives;
-    private final int n;
-
-    // varaibles for one point
-    private int[] lastObjectiveVal;
+    private final boolean initialFiltering;
     private int[] upperRegionCorner;
-    private List<int[]> forbiddenValues;
     private boolean firstPropagation = true;
-    private Solution lastSolution;
     private boolean firstPartialSolution = false;
-    private final boolean portfolio;
-
-    private final Model model;
 
     //***********************************************************************************
     // CONSTRUCTOR
@@ -68,13 +43,10 @@ public class ParetoMaximizerImproveAllObjectives extends Propagator<IntVar> impl
      *
      * @param objectives objective variables (must all be optimized in the same direction)
      */
-    public ParetoMaximizerImproveAllObjectives(final IntVar[] objectives, boolean portfolio) {
-        super(objectives, PropagatorPriority.LINEAR, false);
-        this.objectives = objectives.clone();
-        n = objectives.length;
-        model = this.objectives[0].getModel();
+    public ParetoMaximizerGIACoverage(final IntVar[] objectives, boolean portfolio, PropagatorPriority priority) {
+        super(objectives, priority, false, portfolio);
         this.setLastSolution(new Solution(model));
-        this.portfolio = portfolio;
+        this.initialFiltering = true;
     }
 
     //***********************************************************************************
@@ -83,6 +55,7 @@ public class ParetoMaximizerImproveAllObjectives extends Propagator<IntVar> impl
 
     @Override
     public void onSolution() {
+        // todo add lazy bound
         firstPartialSolution = true;
         // get objective values
         boolean saveSolution = true;
@@ -121,7 +94,9 @@ public class ParetoMaximizerImproveAllObjectives extends Propagator<IntVar> impl
         // todo comment firstPropagation
         if (firstPropagation) {
             firstPropagation = false;
-            applyInitialFiltering();
+            if (initialFiltering) {
+                applyInitialFiltering();
+            }
         }
         if (firstPartialSolution) {
             computeDominatedArea();
@@ -139,65 +114,8 @@ public class ParetoMaximizerImproveAllObjectives extends Propagator<IntVar> impl
                 objectives[i].updateLowerBound(lastObjectiveVal[i], this);
             }
         }
-        // check forbidden values
-        if (forbiddenValues != null){
-            for (int[] forbiddenValue : forbiddenValues){
-                for (int i = 0; i < n; i++) {
-                    if (objectives[i].contains(forbiddenValue[i])){
-                        objectives[i].removeValue(forbiddenValue[i], this);
-                    }
-                }
-            }
-        }
     }
 
-    private void computeDominatedArea() throws ContradictionException{
-        boolean someLBoundBigger = false;
-
-        // update all objectives lower bound
-        for (int i = 0; i < n; i++) {
-            if (objectives[i].getLB() < lastObjectiveVal[i]){
-                // the line below cause contradiction if the lower bound cannot take a value equal or bigger than the last solution
-                objectives[i].updateLowerBound(lastObjectiveVal[i], this);
-            }else if (objectives[i].getLB() > lastObjectiveVal[i]){ // todo never set the propagator as passive until the problem is fixed, check the todo in setPassive()
-                someLBoundBigger = true;
-            }
-        }
-
-        if (!someLBoundBigger){
-            //all the lower bounds are equal to the last solution, there should be at least one upper bound that is bigger
-            //if not then fails
-            boolean atLeastOneBigger = false;
-            int onlyOneBiggerIdx = -1;
-            // check that current solution is bigger than the last one
-            for (int i = 0; i < n; i++) {
-                if (objectives[i].getUB() > lastObjectiveVal[i]){
-                    if (atLeastOneBigger && onlyOneBiggerIdx != -1){
-                        onlyOneBiggerIdx = -1;
-                    }else{
-                        atLeastOneBigger = true;
-                        onlyOneBiggerIdx = i;
-                    }
-                }
-            }
-            if (atLeastOneBigger){
-                if (onlyOneBiggerIdx != -1){
-                    // only one objective has bigger upper bound than the last solution
-                    if (objectives[onlyOneBiggerIdx].getLB() < lastObjectiveVal[onlyOneBiggerIdx] + 1){
-                        // update the lower bound of the only one bigger
-                        objectives[onlyOneBiggerIdx].updateLowerBound(lastObjectiveVal[onlyOneBiggerIdx] + 1, this);
-                    }
-                }
-            }else{
-                fails();
-            }
-        }//else{
-            // all lower bounds are bigger than the last solution
-            // todo check why is not working. For the instance vOptLib--ukp--2KP50-1A after lastObjectiveVal[0] == 877 && lastObjectiveVal[1] == 926, the propagator is set to passive and
-            //  the next solution found is 890,949, but after that the propagator keeps inactive and a new solution is found with values 887, 995 which violates the constraint
-            //this.setPassive();
-        //}
-    }
 
 
     @Override
@@ -225,26 +143,30 @@ public class ParetoMaximizerImproveAllObjectives extends Propagator<IntVar> impl
         }
     }
 
-    public Solution getLastFeasibleSolution() {
-        return lastSolution;
+    public void prepareGIAMaximizerFirstSolution() {
+
     }
 
-    public int[] getLastObjectiveVal() {
-        return lastObjectiveVal;
+    public void prepareGIAMaximizerForNextSolution(){
+        configureInitialUbLb();
+        setLastSolution(null);
     }
 
     public void configureInitialUbLb(ParetoFeasibleRegion feasible_region){
         this.lastObjectiveVal = feasible_region.getLowerCorner().clone();
-        this.upperRegionCorner = feasible_region.getUpperCorner();
+        this.upperRegionCorner = feasible_region.getUpperCorner().clone();
         firstPropagation = true;
         firstPartialSolution = false;
-        if (feasible_region.getEfficientCorners().size() > 0) {
-            forbiddenValues = feasible_region.getEfficientCorners();
-        }
     }
 
-    public void setLastSolution(Solution lastSolution) {
-        this.lastSolution = lastSolution;
+    public void configureInitialUbLb(){
+        // todo if config criteria is not none change the value of lastObjectiveVal
+        this.lastObjectiveVal = new int[objectives.length];
+        for (int i = 0; i < objectives.length; i++) {
+            lastObjectiveVal[i] = objectives[i].getLB();
+        }
+        firstPropagation = true;
+        firstPartialSolution = false;
     }
 
     public int[] getObjectivesValue() {

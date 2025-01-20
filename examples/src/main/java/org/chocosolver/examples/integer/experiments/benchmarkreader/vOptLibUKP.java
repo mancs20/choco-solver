@@ -22,7 +22,7 @@ public class vOptLibUKP extends BenchamarkReader implements ProblemUKP {
 //        File file = getFileFromFolder(directoryPath, fileName);
 
         // Variables for N, P, and K
-        int N = 0, P = 0, K = 0;
+        int numberOfObjects = 0, numberOfObjectives = 0, numberOfConstraints = 0;
 
         // Lists to store the values before converting to arrays
         List<List<Integer>> objectivesList = new ArrayList<>();
@@ -41,11 +41,11 @@ public class vOptLibUKP extends BenchamarkReader implements ProblemUKP {
 
                 if (line.startsWith("#")) {
                     if (line.equals("# N")) {
-                        N = Integer.parseInt(br.readLine().trim());
+                        numberOfObjects = Integer.parseInt(br.readLine().trim());
                     } else if (line.equals("# P")) {
-                        P = Integer.parseInt(br.readLine().trim());
+                        numberOfObjectives = Integer.parseInt(br.readLine().trim());
                     } else if (line.equals("# K")) {
-                        K = Integer.parseInt(br.readLine().trim());
+                        numberOfConstraints = Integer.parseInt(br.readLine().trim());
                     } else if (line.contains("# Objectif")) {
                         currentList = new ArrayList<>();
                         objectivesList.add(currentList);
@@ -62,7 +62,7 @@ public class vOptLibUKP extends BenchamarkReader implements ProblemUKP {
                         // Add the value to the current list
                         currentList.add(Integer.parseInt(line));
                         lineCount++;
-                        if (lineCount == N) {
+                        if (lineCount == numberOfObjects) {
                             currentList = null; // Stop adding to the list
                         }
                     }else{
@@ -71,9 +71,9 @@ public class vOptLibUKP extends BenchamarkReader implements ProblemUKP {
                 }
             }
             // verify that the number of objectives and constraints is equal to P and K
-            if (objectivesList.size() != P || constraintList.size() != K) {
-                throw new IllegalArgumentException("Wrong reading of: " + filePath + ". P=" + P + " and K=" +
-                        K + " but found " + objectivesList.size() + " objectives and " +
+            if (objectivesList.size() != numberOfObjectives || constraintList.size() != numberOfConstraints) {
+                throw new IllegalArgumentException("Wrong reading of: " + filePath + ". P=" + numberOfObjectives + " and K=" +
+                        numberOfConstraints + " but found " + objectivesList.size() + " objectives and " +
                         constraintList.size() + " constraints");
             }
         } catch (IOException e) {
@@ -82,16 +82,16 @@ public class vOptLibUKP extends BenchamarkReader implements ProblemUKP {
         }
 
         //convert to arrays
-        int [][] objectivesWeights = new int[P][N];
-        for (int i = 0; i < P; i++) {
+        int [][] objectivesWeights = new int[numberOfObjectives][numberOfObjects];
+        for (int i = 0; i < numberOfObjectives; i++) {
             List<Integer> currentList = objectivesList.get(i);
-            for (int j = 0; j < N; j++) {
+            for (int j = 0; j < numberOfObjects; j++) {
                 objectivesWeights[i][j] = currentList.get(j);
             }
         }
-        int[] constraintsWeights = new int[N];
+        int[] constraintsWeights = new int[numberOfObjects];
         List<Integer> currentList = constraintList.get(0);
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < numberOfObjects; i++) {
             constraintsWeights[i] = currentList.get(i);
         }
 

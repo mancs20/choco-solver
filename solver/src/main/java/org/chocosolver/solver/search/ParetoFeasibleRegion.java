@@ -1,24 +1,13 @@
 package org.chocosolver.solver.search;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class ParetoFeasibleRegion {
     final private int[] lowerCorner;
     final private int[] upperCorner;
-    final private List<int[]> efficientCorners;
 
     // Constructor
     public ParetoFeasibleRegion(int[] lowerCorner, int[] upperCorner) {
         this.lowerCorner = lowerCorner;
         this.upperCorner = upperCorner;
-        this.efficientCorners = new ArrayList<>();
-    }
-
-    public ParetoFeasibleRegion(int[] lowerCorner, int[] upperCorner, List<int[]> efficientCorners) {
-        this.lowerCorner = lowerCorner;
-        this.upperCorner = upperCorner;
-        this.efficientCorners = efficientCorners != null ? efficientCorners : new ArrayList<>();
     }
 
     // Method to calculate nVolume
@@ -36,10 +25,6 @@ public class ParetoFeasibleRegion {
 
     public int[] getUpperCorner() {
         return upperCorner;
-    }
-
-    public List<int[]> getEfficientCorners() {
-        return efficientCorners;
     }
 
     public double getRegionVolume(){

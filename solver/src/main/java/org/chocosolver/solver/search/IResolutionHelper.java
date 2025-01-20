@@ -15,6 +15,7 @@ import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.Solver;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.constraints.Propagator;
+import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.constraints.UpdatablePropagator;
 import org.chocosolver.solver.constraints.extension.Tuples;
 import org.chocosolver.solver.constraints.extension.TuplesFactory;
@@ -24,7 +25,7 @@ import org.chocosolver.solver.constraints.unary.NotMember;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
 import org.chocosolver.solver.objective.ParetoMaximizer;
-import org.chocosolver.solver.objective.ParetoMaximizerImproveAllObjectives;
+import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
 import org.chocosolver.solver.search.limits.ACounter;
 import org.chocosolver.solver.search.limits.SolutionCounter;
 import org.chocosolver.solver.search.measure.IMeasures;
@@ -503,12 +504,48 @@ public interface IResolutionHelper extends ISelf<Solver> {
         return pareto.getParetoFront();
     }
 
+    default Object[] findParetoFrontWithFrontEvolutionInfo(IntVar[] objectives, boolean maximize, Criterion... stop) {
+        ref().addStopCriterion(stop);
+        ref().getModel().clearObjective();
+        ParetoMaximizer pareto = new ParetoMaximizer(
+                Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new)
+        );
+        Constraint c = new Constraint("PARETO", pareto);
+        c.post();
+        List<String> recorderList = new ArrayList<>();
+        List<Solution> allSolutions = new ArrayList<>();
+        try {
+            while (ref().solve()) {
+                pareto.onSolution();
+                recorderList.add(ref().getMeasures().toString());
+                allSolutions.add(pareto.getLastParetoFrontSolution());
+            }
+        } catch (Exception e) {
+            System.err.println("Exception during solving: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            try {
+                recorderList.add(ref().getMeasures().toString());
+                ref().removeStopCriterion(stop);
+                ref().getModel().unpost(c);
+            } catch (Exception e) {
+                System.err.println("Exception during cleaning: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        return new Object[]{pareto.getParetoFront(), recorderList, allSolutions};
+    }
+
 
     /**
      * todo write description
      *
      */
-    default Object[] findParetoFrontByImprovingAllObjectives(IntVar[] objectives, boolean maximize, float timeout, Criterion... stop) throws Exception {
+    default Object[] BiObjGIA_regionImplementation(IntVar[] objectives, boolean maximize, float timeout,
+                                                   Criterion... stop) throws Exception {
+
+        long startTimeNano = System.nanoTime();
+
         //convert to maximization problem
         objectives = Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new);
 
@@ -523,7 +560,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
         ArrayList<ParetoFeasibleRegion> possibleFeasibleHyperrectangles = new ArrayList<>();
         possibleFeasibleHyperrectangles.add(initialRegion);
         ref().addStopCriterion(stop);
-        ParetoMaximizerImproveAllObjectives paretoPoint = new ParetoMaximizerImproveAllObjectives(objectives, false);
+        ParetoMaximizerGIACoverage paretoPoint = new ParetoMaximizerGIACoverage(objectives, false, PropagatorPriority.BINARY);
         Constraint c = new Constraint("PARETOOPTALLOBJ", paretoPoint);
         c.post();
         boolean timeoutReached = false;
@@ -532,6 +569,11 @@ public interface IResolutionHelper extends ISelf<Solver> {
             feasibleRegion = getNextPossibleRegion(possibleFeasibleHyperrectangles);
             paretoPoint.configureInitialUbLb(feasibleRegion);
             paretoPoint.setLastSolution(null);
+            timeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
+            if (timeout <= 0){
+                timeoutReached = true;
+                break;
+            }
             while (ref().solve()) {
                 paretoPoint.onSolution();
             }
@@ -542,26 +584,21 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 int[] lastObjectives = paretoPoint.getLastObjectiveVal();
                 paretoSolutions.add(solution);
                 // add the 2 new possible feasible regions
-                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoImproveAllObjsFeasibleRegions(feasibleRegion, lastObjectives);
+                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoGIAFeasible2DRegions(feasibleRegion, lastObjectives);
                 possibleFeasibleHyperrectangles.addAll(newFeasibleRegions);
             }
             // reset to the initial state
-            //ref().getEnvironment().worldPopUntil(0);
             if (ref().isStopCriterionMet()){
                 timeoutReached = true;
             }else{
-                float elapsedTime = ref().getTimeCount();
-                timeout = timeout - elapsedTime;
                 if (solution != null) {
                     // todo try to find a better way to reset the model, hardreset makes slower the next search.
                     //  This has to be done because in some cases (knapsack) after a combination feasible, then infeasible,
                     //  the following area could result infeasible even if in reallity was feasible.
                     ref().hardReset();
-//                    ref().reset();
                 }else{
                     ref().reset();
                 }
-                ref().limitTime(timeout + "s");
             }
         }
         ref().getModel().unpost(c);
@@ -588,46 +625,247 @@ public interface IResolutionHelper extends ISelf<Solver> {
         return idBiggerRegion;
     }
 
-    default List<ParetoFeasibleRegion> getNewParetoImproveAllObjsFeasibleRegions(ParetoFeasibleRegion feasibleRegion, int[] solutionObjectives){
+    default List<ParetoFeasibleRegion> getNewParetoGIAFeasible2DRegions(ParetoFeasibleRegion feasibleRegion, int[] solutionObjectives){
         List<ParetoFeasibleRegion> newHyperrectangles = new ArrayList<>();
         int[] lowerBoundCorner = feasibleRegion.getLowerCorner();
         int[] upperBoundCorner = feasibleRegion.getUpperCorner();
 
-        // check if there were efficient corners
-        List<int[]> previousEfficientCorners = feasibleRegion.getEfficientCorners();
-        int[][] newEfficientCorners = new int[2][];
-        if (!previousEfficientCorners.isEmpty()){
-            for (int[] efficientCorner:previousEfficientCorners) {
-                // left feasible region
-                if (efficientCorner[0] < solutionObjectives[0]){
-                    newEfficientCorners[0] = efficientCorner;
-                }else{
-                    newEfficientCorners[1] = efficientCorner; // rigth feasible region
-                }
-            }
-        }
         // 2 feasible regions are produce, left to the solution point and right (the sense is given in the x-axis)
         ArrayList<int[]> newLowerCorners = new ArrayList<>();
-        newLowerCorners.add(new int[] {lowerBoundCorner[0], solutionObjectives[1]});
-        newLowerCorners.add(new int[] {solutionObjectives[0], lowerBoundCorner[1]});
+        newLowerCorners.add(new int[] {lowerBoundCorner[0], solutionObjectives[1]+1});
+        newLowerCorners.add(new int[] {solutionObjectives[0]+1, lowerBoundCorner[1]});
         ArrayList<int[]> newUpperCorners = new ArrayList<>();
-        newUpperCorners.add(new int[] {solutionObjectives[0], upperBoundCorner[1]});
-        newUpperCorners.add(new int[] {upperBoundCorner[0], solutionObjectives[1]});
-        for (int i = 0; i < newEfficientCorners.length; i++) {
-            ParetoFeasibleRegion newFeasibleRegion;
-            List<int[]> efficientCorners = new ArrayList<>();
-            efficientCorners.add(solutionObjectives);
-            if (newEfficientCorners[i] != null){
-                efficientCorners.add(newEfficientCorners[i]);
-            }
-            newFeasibleRegion = new ParetoFeasibleRegion(newLowerCorners.get(i),
-                    newUpperCorners.get(i), efficientCorners);
+        newUpperCorners.add(new int[] {solutionObjectives[0]-1, upperBoundCorner[1]});
+        newUpperCorners.add(new int[] {upperBoundCorner[0], solutionObjectives[1]-1});
+
+        for (int i = 0; i < newLowerCorners.size(); i++) {
+            ParetoFeasibleRegion newFeasibleRegion = new ParetoFeasibleRegion(newLowerCorners.get(i),
+                    newUpperCorners.get(i));
             newHyperrectangles.add(newFeasibleRegion);
         }
 
         return newHyperrectangles;
     }
 
+    /**
+     * todo write description
+     *
+     */
+    // todo is done for 2 objectives and finds the disjucntion as in the paper
+    default Object[] findParetoFrontByDisjunctiveProgramming(IntVar[] objectives, boolean maximize, float timeout,
+                                                             Criterion... stop) throws Exception {
+        long startTimeNano = System.nanoTime();
+        // convert to minimization
+        objectives = Stream.of(objectives).map(o -> maximize ? ref().getModel().neg(o) : o).toArray(IntVar[]::new);
+
+        if (objectives.length != 2){
+            throw new Exception("Finding the pareto front by disjunction optimzation is only implemented for 2 objectives");
+        }
+        List<Solution> paretoSolutions = new ArrayList<>();
+        List<String> recorderList = new ArrayList<>();
+
+        // stop criterion
+        ref().addStopCriterion(stop);
+        boolean timeoutReached = false;
+
+        // find the minimum values for each objective k
+        int[] b = new int[objectives.length];
+        int idObjective = 0;
+        while (!timeoutReached && idObjective < objectives.length){
+            timeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
+            if (timeout <= 0){
+                timeoutReached = true;
+                break;
+            }
+            Solution solution = findOptimalSolution(objectives[idObjective], false, stop);
+            recorderList.add(ref().getMeasures().toString());
+
+            if (ref().isStopCriterionMet()){
+                timeoutReached = true;
+            }else{
+                ref().reset();
+            }
+            if (solution != null){
+                // TODO add temp solution to the ParetoFront and remove it later if it is not a Pareto optimal solution
+                b[idObjective] = solution.getIntVal(objectives[idObjective]);
+                ref().getModel().arithm(objectives[idObjective], ">=", b[idObjective]).post();
+                idObjective++;
+            }else{
+                throw new Exception("No solution found for the objective " + idObjective);
+            }
+        }
+
+        // create objective function
+        int LBsum = 0;
+        int UBsum = 0;
+        for (int i = 0; i < objectives.length; i++) {
+            LBsum += b[i];
+            UBsum += objectives[i].getUB();
+        }
+        IntVar objectiveSum = ref().getModel().intVar("objectiveSum", LBsum, UBsum);
+        ref().getModel().sum(objectives, "=", objectiveSum).post();
+
+        int[] currentDisjunction = new int[objectives.length];
+        for (int i = 0; i < objectives.length; i++) {
+            currentDisjunction[i] = objectives[i].getUB() + 1;
+        }
+        HashMap<String, String> disjunctions = new HashMap<>();
+        disjunctions.put(Arrays.toString(currentDisjunction), "feasible");
+
+        Constraint[] constraintObjectives = new Constraint[objectives.length];
+        boolean keepExploring = true;
+
+        while (keepExploring && !timeoutReached){
+            // post current disjunction constraint
+            for (int i = 0; i < objectives.length; i++) {
+                constraintObjectives[i] = ref().getModel().arithm(objectives[i], "<", currentDisjunction[i]);
+                constraintObjectives[i].post();
+            }
+            timeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
+            if (timeout <= 0){
+                timeoutReached = true;
+                break;
+            }
+            Solution solution = findOptimalSolution(objectiveSum, false, stop);
+
+            // Get statistics
+            recorderList.add(ref().getMeasures().toString());
+            if (solution != null){
+                disjunctions.put(Arrays.toString(currentDisjunction), "explored");
+                int[] solutionObjectives = new int[objectives.length];
+                for (int i = 0; i < objectives.length; i++) {
+                    solutionObjectives[i] = solution.getIntVal(objectives[i]);
+                }
+                paretoSolutions.add(solution);
+                // get the new disjunctions
+                ArrayList<String> newDisjunctions = new ArrayList<>();
+                for (String conjunctionString: disjunctions.keySet()) {
+                    int[] conjunction = Arrays.stream(conjunctionString.replace("[", "").replace("]", "").split(","))
+                            .map(String::trim)
+                            .mapToInt(Integer::parseInt)
+                            .toArray();
+                    newDisjunctions.addAll(getNewDisjunctions(conjunction, solutionObjectives));
+                }
+                applyDominance(newDisjunctions);
+                updateDisjunctionLabels(disjunctions, newDisjunctions, b);
+            }else{
+                disjunctions.put(Arrays.toString(currentDisjunction), "infeasible");
+            }
+            currentDisjunction = getNextDisjunction(disjunctions);
+            if (currentDisjunction == null){
+                keepExploring = false;
+            }
+
+            if (keepExploring){
+                // reset to the initial state
+                if (ref().isStopCriterionMet()){
+                    timeoutReached = true;
+                }else{
+                    if (solution != null){
+                        ref().hardReset();
+                    }else{
+                        ref().reset();
+                    }
+                }
+
+                // unpost constraints
+                for (Constraint constraintObjective : constraintObjectives) {
+                    if (constraintObjective != null) {
+                        ref().getModel().unpost(constraintObjective);
+                    }
+                }
+            }
+        }
+
+        ref().removeStopCriterion(stop);
+        return new Object[]{paretoSolutions, recorderList};
+    }
+
+    private ArrayList<String> getNewDisjunctions(int[] conjunctionTarget, int[] disjunctionsNew){
+        ArrayList<String> newDisjunctions = new ArrayList<>();
+        for (int i = 0; i < conjunctionTarget.length; i++) {
+            int[] tempDisjunction = new int[conjunctionTarget.length];
+            System.arraycopy(conjunctionTarget,0, tempDisjunction, 0, conjunctionTarget.length);
+            tempDisjunction[i] = Math.min(disjunctionsNew[i], conjunctionTarget[i]);
+            newDisjunctions.add(Arrays.toString(tempDisjunction));
+        }
+
+        return newDisjunctions;
+    }
+
+    private void applyDominance(ArrayList<String> disjunctionsStrings){
+        ArrayList<int[]> disjunctions = new ArrayList<>();
+        for (String disjunctionString: disjunctionsStrings) {
+            int[] disjunction = Arrays.stream(disjunctionString.replace("[", "").replace("]", "").split(","))
+                    .map(String::trim)  // Trim any leading or trailing spaces
+                    .mapToInt(Integer::parseInt)
+                    .toArray();
+            disjunctions.add(disjunction);
+        }
+        for (int i = 0; i < disjunctions.size() - 1; i++) {
+            for (int j = i+1; j < disjunctions.size(); j++) {
+                boolean iDominatesJ = true;
+                boolean jDominatesI = true;
+                for (int k = 0; k < disjunctions.get(i).length; k++) {
+                    if (disjunctions.get(i)[k] < disjunctions.get(j)[k]){
+                        iDominatesJ = false;
+                    }else if (disjunctions.get(i)[k] > disjunctions.get(j)[k]){
+                        jDominatesI = false;
+                    }
+                }
+                if (iDominatesJ) {
+                    disjunctions.remove(j);
+                    disjunctionsStrings.remove(j);
+                    j--;
+                } else if (jDominatesI) {
+                    disjunctions.remove(i);
+                    disjunctionsStrings.remove(i);
+                    i--;
+                    break;
+                }
+            }
+        }
+    }
+
+    private void updateDisjunctionLabels(HashMap<String, String> disjunctions, ArrayList<String> newDisjunctions, int[] lowerBounds){
+        HashSet<String> newDisjunctionsMap = new HashSet<>(newDisjunctions);
+        disjunctions.keySet().removeIf(conjunctionString ->
+                !newDisjunctionsMap.contains(conjunctionString)
+        );
+
+        for (String newConjunction: newDisjunctions) {
+            if (!disjunctions.containsKey(newConjunction)){
+                // check if any element of the conjunction is less than the lower bound
+                int[] conjunction = Arrays.stream(newConjunction.replace("[", "").replace("]", "").split(","))
+                        .map(String::trim)  // Trim any leading or trailing spaces
+                        .mapToInt(Integer::parseInt)
+                        .toArray();
+                boolean feasible = true;
+                for (int i = 0; i < conjunction.length; i++) {
+                    if (conjunction[i] < lowerBounds[i]){
+                        feasible = false;
+                        break;
+                    }
+                }
+                disjunctions.put(newConjunction, feasible ? "feasible": "infeasible");
+            }
+        }
+    }
+
+    private int[] getNextDisjunction(HashMap<String, String> disjunctions){
+        int[] nextDisjunction = null;
+        for (String disjunction: disjunctions.keySet()) {
+            if (disjunctions.get(disjunction).equals("feasible")){
+                String[] stringParts = disjunction.replace("[", "").replace("]", "").split(", ");
+                nextDisjunction = new int[stringParts.length];
+                for (int i = 0; i < stringParts.length; i++) {
+                    nextDisjunction[i] = Integer.parseInt(stringParts[i]);
+                }
+                break;
+            }
+        }
+        return nextDisjunction;
+    }
 
     /**
      * todo write description
@@ -636,8 +874,10 @@ public interface IResolutionHelper extends ISelf<Solver> {
     // todo is done for 2 objectives and instead of finding the disjucntion as in the paper, it finds the areas as in
     //  unsatisfaction. The difference is that in unsatisfaction we don't optimize, here we optimize the sum of the
     //  objectives
-    default Object[] findParetoFrontByDisjunctiveProgramming(IntVar[] objectives, boolean maximize, float timeout,
+    default Object[] findParetoFrontByDisjunctiveProgrammingSelRegionLikeImproveAll(IntVar[] objectives, boolean maximize, float timeout,
                                                              Criterion... stop) throws Exception {
+        long startTimeNano = System.nanoTime();
+
         List<Solution> paretoSolutions = new ArrayList<>();
         List<String> recorderList = new ArrayList<>();
         if (objectives.length != 2){
@@ -649,7 +889,6 @@ public interface IResolutionHelper extends ISelf<Solver> {
         ArrayList<ParetoFeasibleRegion> possibleFeasibleHyperrectangles = new ArrayList<>();
         possibleFeasibleHyperrectangles.add(initialRegion);
         ref().addStopCriterion(stop);
-        // todo create constraints as in the paper
         Constraint[] constraintObjectives = new Constraint[8];
         boolean timeoutReached = false;
         IntVar objectiveSum = ref().getModel().intVar("objectiveSum", objectives[0].getLB() + objectives[1].getLB(),
@@ -666,17 +905,12 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 constraintObjectives[j+1] = ref().getModel().arithm(objectives[i], "<=", feasibleRegion.getUpperCorner()[i]);
                 constraintObjectives[j+1].post();
             }
-            // constraint efficient points
-            for (int[] efficientPoint: feasibleRegion.getEfficientCorners()) {
-                for (int i = 0; i < objectives.length; i++) {
-                    constraintObjectives[i + 2 * objectives.length] = ref().getModel().arithm(objectives[i], "!=", efficientPoint[i]);
-                    constraintObjectives[i + 2 * objectives.length].post();
-                }
+            timeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
+            if (timeout <= 0){
+                timeoutReached = true;
+                break;
             }
-//            paretoPoint.configureInitialUbLb(feasibleRegion);
-//            paretoPoint.setLastSolution(null);
             Solution solution = findOptimalSolution(objectiveSum, maximize, stop);
-
 
             // Get statistics
             recorderList.add(ref().getMeasures().toString());
@@ -687,17 +921,20 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 }
                 paretoSolutions.add(solution);
                 // add the 2 new possible feasible regions
-                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoImproveAllObjsFeasibleRegions(feasibleRegion, solutionObjectives);
+                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoGIAFeasible2DRegions(feasibleRegion, solutionObjectives);
                 possibleFeasibleHyperrectangles.addAll(newFeasibleRegions);
             }
             // reset to the initial state
-            //ref().getEnvironment().worldPopUntil(0);
             if (ref().isStopCriterionMet()){
                 timeoutReached = true;
             }else{
                 float elapsedTime = ref().getTimeCount();
                 timeout = timeout - elapsedTime;
-                ref().reset();
+                if (solution != null){
+                    ref().hardReset();
+                }else{
+                    ref().reset();
+                }
                 ref().limitTime(timeout + "s");
             }
 
@@ -711,6 +948,14 @@ public interface IResolutionHelper extends ISelf<Solver> {
 
         ref().removeStopCriterion(stop);
         return new Object[]{paretoSolutions, recorderList};
+    }
+
+    default float updateSolverTimeoutCurrentTime(Solver solver, float timeout, long startTimeNano){
+        long currentTimeNano = System.nanoTime();
+        float elapsedTime = (float) (currentTimeNano - startTimeNano) / 1_000_000_000;
+        timeout = timeout - elapsedTime;
+        solver.limitTime(timeout + "s");
+        return timeout;
     }
 
     /**

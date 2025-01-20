@@ -21,11 +21,11 @@ public class ParetoFrontProcessor {
             bounds[i][1] = paretoObjectives[i].getUB();
         }
         this.decisionVariables = decisionVariables;
-        paretoFront = getParetoFrontFromSolutions();
+        paretoFront = getParetoFrontFromSolutions(this.solutions, this.objectives);
         this.maximize = maximize;
     }
 
-    private int[][] getParetoFrontFromSolutions() {
+    public static int[][] getParetoFrontFromSolutions(Solution[] solutions, IntVar[] objectives) {
         int[][] paretoFront = new int[solutions.length][];
         for (int i = 0; i < solutions.length; i++) {
             int[] newParetoPoint = new int[objectives.length];

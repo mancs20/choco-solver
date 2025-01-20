@@ -32,6 +32,24 @@ public class BuilderModel {
                     throw new IllegalArgumentException("Invalid problem name: " + problemName);
             }
         }
+        if (config.getBenchmark().contains("MOOLibrary")) {
+            // check for the different problems of MOOLibrary
+            ProblemName problemName;
+            try {
+                problemName = ProblemName.valueOf(config.getProblem().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid problem name: " + config.getProblem());
+            }
+            switch (problemName) {
+                case UKP:
+                    return new MOOLibraryUKP(config);
+                default:
+                    throw new IllegalArgumentException("Invalid problem name: " + problemName);
+            }
+        }
+        if (config.getBenchmark().contains("taillard") && config.getInstancePath().endsWith(".fzn")) {
+            return new TaillardDznFileReader(config);
+        }
         throw new IllegalArgumentException("Invalid benchmark: " + config.getBenchmark());
     }
 

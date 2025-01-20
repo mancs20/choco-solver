@@ -30,14 +30,11 @@ public class Pareto {
 
     public Object[] run(Model model, IntVar[] objectives, boolean maximize) {
         // Optimise independently two variables using the Pareto optimizer
-        long startTime = System.nanoTime();
         List<Solution> solutions = model.getSolver().findParetoFront(objectives, maximize);
-        long endTime = System.nanoTime();
-        float elapsedTime = (float) (endTime - startTime) / 1_000_000_000;
         // stats
         List<String> recorderList = new ArrayList<>();
         recorderList.add(model.getSolver().getMeasures().toString());
 
-        return new Object[]{solutions, recorderList, elapsedTime};
+        return new Object[]{solutions, recorderList};
     }
 }

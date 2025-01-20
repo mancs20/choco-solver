@@ -15,11 +15,16 @@ package org.chocosolver.examples.integer;/*
  */
 
 import org.chocosolver.examples.integer.experiments.benchmarkreader.ModelObjectivesVariables;
+import org.chocosolver.examples.integer.experiments.frontgenerators.TimeoutHolder;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.ParallelPortfolio;
 import org.chocosolver.solver.Solution;
+import org.chocosolver.solver.Solver;
 import org.chocosolver.solver.constraints.Constraint;
-import org.chocosolver.solver.objective.ParetoMaximizerImproveAllObjectives;
+import org.chocosolver.solver.constraints.PropagatorPriority;
+import org.chocosolver.solver.objective.GiaConfig;
+import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
+import org.chocosolver.solver.objective.ParetoMaximizerGIAGeneral;
 import org.chocosolver.solver.search.ParetoFeasibleRegion;
 import org.chocosolver.solver.variables.IntVar;
 
@@ -35,23 +40,133 @@ import java.util.stream.Stream;
  */
 
 
-public class ParetoImproveAllObjs {
+abstract public class ParetoGIA implements TimeoutHolder {
+    protected GiaConfig config;
+    protected int numObjectivesAllowed;
+    protected Model model;
+    protected Solver solver;
+    protected IntVar[] objectives;
+    protected List<Solution> paretoSolutions = new ArrayList<>();
+    protected List<String> recorderList = new ArrayList<>();
+    protected ParetoMaximizerGIAGeneral paretoPoint;
+    protected float timeout;
+    protected int[] lastObjectiveValues;
+    protected boolean stopCondition;
+    protected long startTimeNano;
 
-    public Object[] run(Model model, IntVar[] objectives, boolean maximize, int timeout) {
+    public ParetoGIA(GiaConfig config, int timeout) {
+        this.config = config;
+        this.timeout = timeout;
+        stopCondition = false;
+        numObjectivesAllowed = 0; // indefinite number of objectives
+    }
+
+    public Object[] run(boolean maximize, Model model, IntVar[] objectives) {
         // Optimise independently two variables using the Pareto optimizer
-        long startTime = System.nanoTime();
+        startTimeNano = System.nanoTime();
+        preparation(maximize, model, objectives);
         Object[] solutionsAndStats = new Object[0];
         try {
-            solutionsAndStats = model.getSolver().findParetoFrontByImprovingAllObjectives(objectives, maximize, timeout);
+            solutionsAndStats = findFront();
         } catch (Exception e) {
             e.printStackTrace();
         }
-        long endTime = System.nanoTime();
-        float elapsedTime = (float) (endTime - startTime) / 1_000_000_000;
         List<Solution> solutions = (List<Solution>) solutionsAndStats[0];
         List<String> stats = (List<String>) solutionsAndStats[1];
 
-        return new Object[]{solutions, stats, elapsedTime};
+        return new Object[]{solutions, stats};
+    }
+
+    private void preparation(boolean maximize, Model model, IntVar[] objectives){
+        // prepare model and solver
+        this.model = model;
+        this.solver = model.getSolver();
+        //convert to maximization problem
+        this.objectives = Stream.of(objectives).map(o -> maximize ? o : model.neg(o)).toArray(IntVar[]::new);
+        this.lastObjectiveValues = new int[this.objectives.length];
+        try {
+            if (numObjectivesAllowed > 0 && objectives.length > numObjectivesAllowed){
+                throw new Exception("Finding the pareto front by improving all objectives is only implemented for " + numObjectivesAllowed + " objectives");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
+    protected Object[] findFront() {
+        // add pareto constraint
+        paretoPoint = setGIAPropagator(objectives, false);
+        paretoPoint.setBoundedType(config.getBounded());
+
+        Constraint c = new Constraint("paretoGIA", paretoPoint);
+        c.post();
+        paretoPoint.prepareGIAMaximizerFirstSolution();
+        boolean keepExploring = true;
+        while (!stopCondition && keepExploring){
+            keepExploring = getFrontPoint();
+        }
+        return new Object[]{paretoSolutions, recorderList};
+    }
+
+    protected abstract ParetoMaximizerGIAGeneral setGIAPropagator(IntVar[] objectives, boolean portfolio);
+
+    protected boolean getFrontPoint(){
+        timeout = updateSolverTimeoutCurrentTime(solver, timeout, startTimeNano);
+        boolean foundSolution = false;
+        try {
+            while(solver.solve()){
+                paretoPoint.onSolution();
+                foundSolution = true;
+            }
+        } catch (Exception e) {
+            System.err.println("Exception during solving: " + e.getMessage());
+            e.printStackTrace();
+            foundSolution = false;
+        }
+        // Get statistics
+        try {
+            recorderList.add(solver.getMeasures().toString());
+        } catch (Exception e) {
+            System.err.println("Exception recording stats: " + e.getMessage());
+            e.printStackTrace();
+        }
+        if (foundSolution) {
+            Solution solution = paretoPoint.getLastFeasibleSolution();
+            if (solution != null) {
+                lastObjectiveValues = paretoPoint.getLastObjectiveVal();
+                paretoSolutions.add(solution);
+            }
+            // reset to the initial state
+            if (solver.isStopCriterionMet() || ((config.getCriteriaSelection() == GiaConfig.CriteriaSelection.NONE) && solution == null)) {
+                stopCondition = true;
+            } else {
+                if (solution != null) {
+                    // todo try to find a better way to reset the model, hardreset makes slower the next search.
+                    //  This has to be done because in some cases (knapsack) after a combination feasible, then infeasible,
+                    //  the following area could result infeasible even if in reality was feasible.
+                    solver.hardReset();
+                } else {
+                    solver.reset();
+                }
+            }
+            paretoPoint.prepareGIAMaximizerForNextSolution();
+        }
+        return foundSolution;
+    }
+
+    public Object[] runOriginal(Model model, IntVar[] objectives, boolean maximize, int timeout) {
+        // Optimise independently two variables using the Pareto optimizer
+        Object[] solutionsAndStats = new Object[0];
+        try {
+            solutionsAndStats = model.getSolver().BiObjGIA_regionImplementation(objectives, maximize, timeout);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        List<Solution> solutions = (List<Solution>) solutionsAndStats[0];
+        List<String> stats = (List<String>) solutionsAndStats[1];
+
+        return new Object[]{solutions, stats};
     }
 
     public Object[] runWithPortfolio(ModelObjectivesVariables[] modelObjectivesVariables, boolean maximize, int timeout) {
@@ -95,12 +210,12 @@ public class ParetoImproveAllObjs {
 //            mov.getModel().getSolver().addStopCriterion(stop);
 //        }
 
-        ParetoMaximizerImproveAllObjectives[] paretoPointArray = new ParetoMaximizerImproveAllObjectives[modelObjectivesVariables.length];
+        ParetoMaximizerGIACoverage[] paretoPointArray = new ParetoMaximizerGIACoverage[modelObjectivesVariables.length];
         for (int i = 0; i < modelObjectivesVariables.length; i++) {
             int finalI = i;
-            paretoPointArray[i] = new ParetoMaximizerImproveAllObjectives(
-                    Stream.of(modelObjectivesVariables[i].getObjectives()).map(o -> maximize ? o : modelObjectivesVariables[finalI].getModel().neg(o)).toArray(IntVar[]::new), true
-            );
+            paretoPointArray[i] = new ParetoMaximizerGIACoverage(
+                    Stream.of(modelObjectivesVariables[i].getObjectives()).map(o -> maximize ? o : modelObjectivesVariables[finalI].getModel().neg(o)).toArray(IntVar[]::new),
+                    true, choosePropagatorPriority(objectives.length));
             Constraint c = new Constraint("PARETOUNSATISFACTION", paretoPointArray[i]);
             c.post();
         }
@@ -112,6 +227,7 @@ public class ParetoImproveAllObjs {
 
         boolean timeoutReached = false;
         while (possibleFeasibleHyperrectangles.size() > 0 && !timeoutReached){
+            // TODO the part of the feasible region should be done in the ParetoGIASparsity
             ParetoFeasibleRegion feasibleRegion;
             feasibleRegion = getNextPossibleRegion(possibleFeasibleHyperrectangles);
             for (int i = 0; i < modelObjectivesVariables.length; i++) {
@@ -160,7 +276,7 @@ public class ParetoImproveAllObjs {
             if (bestSolution != null){
                 paretoSolutions.add(bestSolution);
                 // add the 2 new possible feasible regions
-                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoUnsatisfactionFeasibleRegions(feasibleRegion, bestObjectiveValues);
+                List<ParetoFeasibleRegion> newFeasibleRegions = model.getSolver().getNewParetoGIAFeasible2DRegions(feasibleRegion, bestObjectiveValues);
                 possibleFeasibleHyperrectangles.addAll(newFeasibleRegions);
             }
 
@@ -184,16 +300,16 @@ public class ParetoImproveAllObjs {
                     }
                 }
                 timeout = timeout - elapsedTime;
-//                ref().reset();
+//                solver.reset();
                 portfolio.getModels().forEach(m -> m.getSolver().reset());
-//                ref().limitTime(timeout + "s");
+//                solver.limitTime(timeout + "s");
                 float finalTimeout = timeout;
                 portfolio.getModels().forEach(m -> m.getSolver().limitTime(finalTimeout + "s"));
             }
         }
         //todo remove the constraints
-//        ref().getModel().unpost(c);
-//        ref().removeStopCriterion(stop);
+//        model.unpost(c);
+//        solver.removeStopCriterion(stop);
         return new Object[]{paretoSolutions, recorderList};
     }
 
@@ -216,43 +332,15 @@ public class ParetoImproveAllObjs {
         return idBiggerRegion;
     }
 
-    private List<ParetoFeasibleRegion> getNewParetoUnsatisfactionFeasibleRegions(ParetoFeasibleRegion feasibleRegion, int[] solutionObjectives){
-        List<ParetoFeasibleRegion> newHyperrectangles = new ArrayList<>();
-        int[] lowerBoundCorner = feasibleRegion.getLowerCorner();
-        int[] upperBoundCorner = feasibleRegion.getUpperCorner();
-
-        // check if there were efficient corners
-        List<int[]> previousEfficientCorners = feasibleRegion.getEfficientCorners();
-        int[][] newEfficientCorners = new int[2][];
-        if (!previousEfficientCorners.isEmpty()){
-            for (int[] efficientCorner:previousEfficientCorners) {
-                // left feasible region
-                if (efficientCorner[0] < solutionObjectives[0]){
-                    newEfficientCorners[0] = efficientCorner;
-                }else{
-                    newEfficientCorners[1] = efficientCorner; // rigth feasible region
-                }
-            }
+    public static PropagatorPriority choosePropagatorPriority(int numObjectives){
+        PropagatorPriority priority;
+        if (numObjectives == 2){
+            priority = PropagatorPriority.BINARY;
+        } else if (numObjectives == 3){
+            priority = PropagatorPriority.TERNARY;
+        } else{
+            priority = PropagatorPriority.LINEAR;
         }
-        // 2 feasible regions are produce, left to the solution point and right (the sense is given in the x-axis)
-        ArrayList<int[]> newLowerCorners = new ArrayList<>();
-        newLowerCorners.add(new int[] {lowerBoundCorner[0], solutionObjectives[1]});
-        newLowerCorners.add(new int[] {solutionObjectives[0], lowerBoundCorner[1]});
-        ArrayList<int[]> newUpperCorners = new ArrayList<>();
-        newUpperCorners.add(new int[] {solutionObjectives[0], upperBoundCorner[1]});
-        newUpperCorners.add(new int[] {upperBoundCorner[0], solutionObjectives[1]});
-        for (int i = 0; i < newEfficientCorners.length; i++) {
-            ParetoFeasibleRegion newFeasibleRegion;
-            List<int[]> efficientCorners = new ArrayList<>();
-            efficientCorners.add(solutionObjectives);
-            if (newEfficientCorners[i] != null){
-                efficientCorners.add(newEfficientCorners[i]);
-            }
-            newFeasibleRegion = new ParetoFeasibleRegion(newLowerCorners.get(i),
-                    newUpperCorners.get(i), efficientCorners);
-            newHyperrectangles.add(newFeasibleRegion);
-        }
-
-        return newHyperrectangles;
+        return priority;
     }
 }
