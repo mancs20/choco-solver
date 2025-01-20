@@ -6,13 +6,13 @@ import org.chocosolver.solver.variables.IntVar;
 public class ModelObjectivesVariables {
     private Model model;
     private IntVar[] objectives;
-    private IntVar[] decisionVaraibles;
+    private Object[] decisionVariables;
     private final boolean maximization;
 
-    public ModelObjectivesVariables(Model model, IntVar[] objectives, IntVar[] decisionVaraibles, boolean maximization) {
+    public ModelObjectivesVariables(Model model, IntVar[] objectives, Object[] decisionVaraibles, boolean maximization) {
         this.model = model;
         this.objectives = objectives;
-        this.decisionVaraibles = decisionVaraibles;
+        this.decisionVariables = decisionVaraibles;
         this.maximization = maximization;
     }
 
@@ -24,8 +24,8 @@ public class ModelObjectivesVariables {
         return objectives;
     }
 
-    public IntVar[] getDecisionVaraibles() {
-        return decisionVaraibles;
+    public Object[] getDecisionVariables() {
+        return decisionVariables;
     }
 
     public boolean isMaximization() {

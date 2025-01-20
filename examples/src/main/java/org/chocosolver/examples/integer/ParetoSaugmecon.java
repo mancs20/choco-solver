@@ -22,6 +22,12 @@ public class ParetoSaugmecon {
     private final List<Solution> solutions = new ArrayList<>();
     private final List<String> recorderList = new ArrayList<>();
     private boolean stopCriterionReached;
+    private boolean performLexicographicOptimization;
+    private boolean cannotUseSaugmeconObjective;
+
+    public ParetoSaugmecon(boolean performLexicographicOptimization) {
+        this.performLexicographicOptimization = performLexicographicOptimization;
+    }
 
     public Object[] run(Model model, IntVar[] objectives, boolean maximize, int timeout) {
         long startTime = System.nanoTime();
@@ -29,7 +35,6 @@ public class ParetoSaugmecon {
         this.model = model;
         solver = this.model.getSolver();
         // transform the problem to maximization
-        // todo check if the below transformation is enough to transform the problem to maximization
         this.objectives = Stream.of(objectives).map(o -> maximize ? o : model.neg(o)).toArray(IntVar[]::new);
         constraintObjectives = new Constraint[objectives.length - 1];
         // Get the best value for each objective (maximization)
@@ -56,6 +61,15 @@ public class ParetoSaugmecon {
             Set<String> previousSolutions = new HashSet<>();
             List<SolutionEfArrayInformation> previousSolutionInformation = new ArrayList<>();
             saugmeconLoop(efArray, rwv, bestObjectiveValues.length, previousSolutionInformation, previousSolutions);
+            // remove the solutions that are dominated by the front
+            if (!performLexicographicOptimization && (cannotUseSaugmeconObjective || objectives.length > 2)){
+                for (int i = solutions.size()-1; i > -1; i--) {
+                    if (solutionKisDominatedByTheFront(solutions.get(i), solutions, i)) {
+                        recorderList.set(i, "No solution" + recorderList.get(i));
+                        solutions.remove(i);
+                    }
+                }
+            }
             // check if the timeout is reached, if not all the solutions are found
             if (stopCriterionReached) {
                 System.out.println("Stop criterion reached, the Pareto front is incomplete");
@@ -63,19 +77,20 @@ public class ParetoSaugmecon {
                 // be removed from the Pareto front approximation
                 int indexInsert = 0;
                 for (int i = 0; i < bestObjectiveValuesSolution.length; i++) {
-                    if (!isDominatedByTheFront(bestObjectiveValuesSolution[i], solutions)) {
+                    // set k to -1 to check if a solution that doesn't belong to the front is dominated by the front
+                    if (!solutionKisDominatedByTheFront(bestObjectiveValuesSolution[i], solutions, -1)) {
                         // if the solution is not dominated by the front, add it to the front at index i
                         solutions.add(indexInsert, bestObjectiveValuesSolution[i]);
                         indexInsert++;
                     }else{
                         // if the solution is dominated by the front, remove it from the recorderList
-                        recorderList.remove(indexInsert);
+                        recorderList.set(indexInsert, "No solution" + recorderList.get(indexInsert));
                     }
                 }
             }else{
                 // remove the elements in recorderList that were found while optimizing individual objectives
                 for (int i = 0; i < bestObjectiveValues.length; i++) {
-                    recorderList.remove(0);
+                    recorderList.set(i, "No solution" + recorderList.get(i));
                 }
             }
         }else{
@@ -127,7 +142,7 @@ public class ParetoSaugmecon {
         }else {
             // update right-hand side values (rhs) for the objective constraints
             updateObjectiveConstraints(efArray);
-            Solution solution = optimizeIntVar(saugmeconObjective, true, true);
+            Solution solution = optimizeIntVar(saugmeconObjective, true, true, true);
             if (stopCriterionReached){
                 if (solution != null) {
                     solutions.add(solution);
@@ -264,7 +279,7 @@ public class ParetoSaugmecon {
         int[] objectivesValues = new int[objectives.length - 1];
         for (int i = 1; i < objectives.length; i++) {
             IntVar objective = objectives[i];
-            Solution solution = optimizeIntVar(objective, maximize, searchForBestObjectivesValues);
+            Solution solution = optimizeIntVar(objective, maximize, searchForBestObjectivesValues, false);
             if (solution != null) {
                 objectivesValues[i - 1] = solution.getIntVal(objective);
                 if (searchForBestObjectivesValues) {
@@ -277,14 +292,23 @@ public class ParetoSaugmecon {
         return objectivesValues;
     }
 
-    private Solution optimizeIntVar(IntVar objective, boolean maximize, boolean saveStats) {
+    private Solution optimizeIntVar(IntVar objective, boolean maximize, boolean saveStats, boolean optimizeSaugmeconObjective) {
         Solution solution = null;
         if (timeout <= 0) {
             stopCriterionReached = true;
         }else{
             solver.limitTime(timeout + "s");
             if (!solver.isStopCriterionMet()) {
-                solution = solver.findOptimalSolution(objective, maximize);
+                if (optimizeSaugmeconObjective && cannotUseSaugmeconObjective){
+                    if (performLexicographicOptimization){
+                        solution = solver.findLexOptimalSolution(objectives, maximize);
+                    }else{
+                        solution = solver.findOptimalSolution(objectives[0], maximize);
+                    }
+                }else{
+                    solution = solver.findOptimalSolution(objective, maximize);
+                }
+
                 timeout = timeout - solver.getTimeCount();
                 if (solution != null && saveStats) {
                     recorderList.add(solver.getMeasures().toString());
@@ -300,6 +324,20 @@ public class ParetoSaugmecon {
     }
 
     private void setSaugmeconObjective() {
+        // check if the saugmecon objective can be calculated as in the paper. If the objectives are to big,
+        // the coefficients in the objective function will exceed the int limit. In this case, there are two options:
+        // 1. optimize objective 1 and at the end check if there are some solutions that do not belong to the pareto
+        // front. This could happen if for the same optimal value of objective 1, there are more than value for
+        // objective i. For example, if the optimal value of objective 1 is 10, and there are two solutions with
+        // objective 2 values 5 and 6, is possible that the solution obtained by the solver is 10, 6, that solution
+        // will be added to the front and then 10,5 will be found. In this case, the solution 10,6 should be removed
+        // from the front.
+        // 2. Apply lexicographic optimization to avoid the situation explained above. In this way the solver only
+        // return 10,5.
+        cannotUseSaugmeconObjective = false;
+        int lbSaugmeconObjective = 0;
+        int ubSaugmeconObjective = 0;
+
         // obj = f1 + eps * (f2/r2 + ... + fn/rn)
         // as we are using integer values, we can use the following formula range_multiplier = (r2*...rn) and 1/eps
         // obj = f1 * range_multiplier * (1 / eps) + range_multiplier * (f2/r2 + ... + fn/rn)
@@ -310,27 +348,50 @@ public class ParetoSaugmecon {
         }
         int rangeMultiplier = 1;
         for (int rangeI : range) {
+            if (rangeMultiplier > Integer.MAX_VALUE / rangeI) {
+                cannotUseSaugmeconObjective = true;
+                lbSaugmeconObjective = objectives[0].getLB();
+                ubSaugmeconObjective = objectives[0].getUB();
+                break;
+            }
             rangeMultiplier *= rangeI;
         }
-        // calculate the 1/eps value
-        // eps <= (1 / (f2_max/r2 + ... + fn_max/rn))
-        // (f2_max/r2 + ... + fn_max/rn) <= 1/eps
-        // 1/eps >= (f2_max/r2 + ... + fn_max/rn) + k, where k is a small value, for integer values we can use 1
-        double inverseEps = 1.0;
-        for (int i = 0; i < bestObjectiveValues.length; i++) {
-            inverseEps += (float) Math.max(bestObjectiveValues[i],nadirObjectiveValues[i]) / (float) range[i];
-        }
-        // todo for the moment the max is undefined
-        saugmeconObjective = model.intVar("saugmeconObjective", 0, IntVar.MAX_INT_BOUND);
-        //saugmeconObjective = f1 * range_multiplier * (1 / eps) + range_multiplier * (f2/r2 + ... + fn/rn)
+
         int[] coefficients = new int[objectives.length];
-        coefficients[0] = (int) (rangeMultiplier * inverseEps);
-        for (int i = 1; i < objectives.length; i++) {
-            coefficients[i] = rangeMultiplier / range[i - 1];
+        if (!cannotUseSaugmeconObjective) {
+            // calculate the 1/eps value
+            // eps <= (1 / (f2_max/r2 + ... + fn_max/rn))
+            // (f2_max/r2 + ... + fn_max/rn) <= 1/eps
+            // 1/eps >= (f2_max/r2 + ... + fn_max/rn) + k, where k is a small value, for integer values we can use 1
+            double inverseEps = 1.0;
+            for (int i = 0; i < bestObjectiveValues.length; i++) {
+                inverseEps += (float) Math.max(bestObjectiveValues[i], nadirObjectiveValues[i]) / (float) range[i];
+            }
+            //saugmeconObjective = f1 * range_multiplier * (1 / eps) + range_multiplier * (f2/r2 + ... + fn/rn)
+            coefficients[0] = (int) (rangeMultiplier * inverseEps);
+            for (int i = 1; i < objectives.length; i++) {
+                coefficients[i] = rangeMultiplier / range[i - 1];
+            }
+
+            for (int i = 0; i < objectives.length; i++) {
+                if (Math.abs((long)((Integer.MAX_VALUE - lbSaugmeconObjective) / coefficients[i])) < Math.max(Math.abs(objectives[i].getUB()), Math.abs(objectives[i].getLB()))) {
+                    cannotUseSaugmeconObjective = true;
+                    lbSaugmeconObjective = objectives[0].getLB();
+                    ubSaugmeconObjective = objectives[0].getUB();
+                    break;
+                }
+                lbSaugmeconObjective += coefficients[i] * objectives[i].getLB();
+                ubSaugmeconObjective += coefficients[i] * objectives[i].getUB();
+            }
         }
-        IntVar[] saugmeconObjectiveArr = new IntVar[objectives.length];
-        System.arraycopy(objectives, 0, saugmeconObjectiveArr, 0, objectives.length);
-        model.scalar(saugmeconObjectiveArr, coefficients, "=", saugmeconObjective).post();
+        if (!cannotUseSaugmeconObjective) {
+            saugmeconObjective = model.intVar("saugmeconObjective", lbSaugmeconObjective, ubSaugmeconObjective);
+            IntVar[] saugmeconObjectiveArr = new IntVar[objectives.length];
+            System.arraycopy(objectives, 0, saugmeconObjectiveArr, 0, objectives.length);
+            model.scalar(saugmeconObjectiveArr, coefficients, "=", saugmeconObjective).post();
+        }else{
+            solver.getModel().getObjective().getModel().clearObjective();
+        }
     }
 
     private void addObjectivesAsConstraints(int[] efArray) {
@@ -367,18 +428,29 @@ public class ParetoSaugmecon {
         }
     }
 
-    public boolean isDominatedByTheFront(Solution newSolution, List<Solution> front) {
-        boolean isDominated = false;
-        for (Solution solution : front) {
-            isDominated = true;
-            for (IntVar objective : objectives) {
-                if (solution.getIntVal(objective) < newSolution.getIntVal(objective)) {
-                    isDominated = false;
+    public boolean solutionKisDominatedByTheFront(Solution newSolution, List<Solution> front, int k) {
+        boolean newSolutionIsDominated = false;
+        // at this point is possible that the
+        for (int i = 0; i < front.size(); i++) {
+            if (i != k){
+                if (solutionADominatesB(front.get(i), newSolution)) {
+                    newSolutionIsDominated = true;
                     break;
                 }
             }
         }
-        return isDominated;
+        return newSolutionIsDominated;
+    }
+
+    private boolean solutionADominatesB(Solution solutionA, Solution solutionB) {
+        boolean dominates = true;
+        for (IntVar objective : objectives) {
+            if (solutionA.getIntVal(objective) < solutionB.getIntVal(objective)) {
+                dominates = false;
+                break;
+            }
+        }
+        return dominates;
     }
 }
 

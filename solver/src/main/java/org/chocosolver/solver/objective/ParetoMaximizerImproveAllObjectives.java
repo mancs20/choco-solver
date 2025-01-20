@@ -32,7 +32,7 @@ import java.util.List;
  * @author Jean-Guillaume Fages
  * @author Jani Simomaa
  */
-public class ParetoMaximizerUnsatisfaction extends Propagator<IntVar> implements IMonitorSolution {
+public class ParetoMaximizerImproveAllObjectives extends Propagator<IntVar> implements IMonitorSolution {
 
     //***********************************************************************************
     // VARIABLES
@@ -68,7 +68,7 @@ public class ParetoMaximizerUnsatisfaction extends Propagator<IntVar> implements
      *
      * @param objectives objective variables (must all be optimized in the same direction)
      */
-    public ParetoMaximizerUnsatisfaction(final IntVar[] objectives, boolean portfolio) {
+    public ParetoMaximizerImproveAllObjectives(final IntVar[] objectives, boolean portfolio) {
         super(objectives, PropagatorPriority.LINEAR, false);
         this.objectives = objectives.clone();
         n = objectives.length;
@@ -118,6 +118,7 @@ public class ParetoMaximizerUnsatisfaction extends Propagator<IntVar> implements
 
     @Override
     public void propagate(int evtmask) throws ContradictionException {
+        // todo comment firstPropagation
         if (firstPropagation) {
             firstPropagation = false;
             applyInitialFiltering();
@@ -233,8 +234,8 @@ public class ParetoMaximizerUnsatisfaction extends Propagator<IntVar> implements
     }
 
     public void configureInitialUbLb(ParetoFeasibleRegion feasible_region){
-        this.upperRegionCorner = feasible_region.getUpperCorner();
         this.lastObjectiveVal = feasible_region.getLowerCorner().clone();
+        this.upperRegionCorner = feasible_region.getUpperCorner();
         firstPropagation = true;
         firstPartialSolution = false;
         if (feasible_region.getEfficientCorners().size() > 0) {

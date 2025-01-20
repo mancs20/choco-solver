@@ -24,11 +24,10 @@ import org.chocosolver.solver.constraints.unary.NotMember;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
 import org.chocosolver.solver.objective.ParetoMaximizer;
-import org.chocosolver.solver.objective.ParetoMaximizerUnsatisfaction;
+import org.chocosolver.solver.objective.ParetoMaximizerImproveAllObjectives;
 import org.chocosolver.solver.search.limits.ACounter;
 import org.chocosolver.solver.search.limits.SolutionCounter;
 import org.chocosolver.solver.search.measure.IMeasures;
-import org.chocosolver.solver.search.measure.MeasuresRecorder;
 import org.chocosolver.solver.search.strategy.Search;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.ESat;
@@ -509,11 +508,14 @@ public interface IResolutionHelper extends ISelf<Solver> {
      * todo write description
      *
      */
-    default Object[] findParetoFrontByUnsatisfaction(IntVar[] objectives, boolean maximize, float timeout, Criterion... stop) throws Exception {
+    default Object[] findParetoFrontByImprovingAllObjectives(IntVar[] objectives, boolean maximize, float timeout, Criterion... stop) throws Exception {
+        //convert to maximization problem
+        objectives = Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new);
+
         List<Solution> paretoSolutions = new ArrayList<>();
         List<String> recorderList = new ArrayList<>();
         if (objectives.length != 2){
-            throw new Exception("Finding the pareto front by unsatisfaction is only implemented for 2 objectives");
+            throw new Exception("Finding the pareto front by improving all objectives is only implemented for 2 objectives");
         }
         int[] lowerCorner = {objectives[0].getLB(), objectives[1].getLB()};
         int[] upperCorner = {objectives[0].getUB(), objectives[1].getUB()};
@@ -521,10 +523,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
         ArrayList<ParetoFeasibleRegion> possibleFeasibleHyperrectangles = new ArrayList<>();
         possibleFeasibleHyperrectangles.add(initialRegion);
         ref().addStopCriterion(stop);
-        ParetoMaximizerUnsatisfaction paretoPoint = new ParetoMaximizerUnsatisfaction(
-                Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new), false
-        );
-        Constraint c = new Constraint("PARETOUNSATISFACTION", paretoPoint);
+        ParetoMaximizerImproveAllObjectives paretoPoint = new ParetoMaximizerImproveAllObjectives(objectives, false);
+        Constraint c = new Constraint("PARETOOPTALLOBJ", paretoPoint);
         c.post();
         boolean timeoutReached = false;
         while (possibleFeasibleHyperrectangles.size() > 0 && !timeoutReached){
@@ -542,7 +542,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 int[] lastObjectives = paretoPoint.getLastObjectiveVal();
                 paretoSolutions.add(solution);
                 // add the 2 new possible feasible regions
-                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoUnsatisfactionFeasibleRegions(feasibleRegion, lastObjectives);
+                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoImproveAllObjsFeasibleRegions(feasibleRegion, lastObjectives);
                 possibleFeasibleHyperrectangles.addAll(newFeasibleRegions);
             }
             // reset to the initial state
@@ -552,7 +552,15 @@ public interface IResolutionHelper extends ISelf<Solver> {
             }else{
                 float elapsedTime = ref().getTimeCount();
                 timeout = timeout - elapsedTime;
-                ref().reset();
+                if (solution != null) {
+                    // todo try to find a better way to reset the model, hardreset makes slower the next search.
+                    //  This has to be done because in some cases (knapsack) after a combination feasible, then infeasible,
+                    //  the following area could result infeasible even if in reallity was feasible.
+                    ref().hardReset();
+//                    ref().reset();
+                }else{
+                    ref().reset();
+                }
                 ref().limitTime(timeout + "s");
             }
         }
@@ -580,7 +588,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
         return idBiggerRegion;
     }
 
-    default List<ParetoFeasibleRegion> getNewParetoUnsatisfactionFeasibleRegions(ParetoFeasibleRegion feasibleRegion, int[] solutionObjectives){
+    default List<ParetoFeasibleRegion> getNewParetoImproveAllObjsFeasibleRegions(ParetoFeasibleRegion feasibleRegion, int[] solutionObjectives){
         List<ParetoFeasibleRegion> newHyperrectangles = new ArrayList<>();
         int[] lowerBoundCorner = feasibleRegion.getLowerCorner();
         int[] upperBoundCorner = feasibleRegion.getUpperCorner();
@@ -633,7 +641,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
         List<Solution> paretoSolutions = new ArrayList<>();
         List<String> recorderList = new ArrayList<>();
         if (objectives.length != 2){
-            throw new Exception("Finding the pareto front by unsatisfaction is only implemented for 2 objectives");
+            throw new Exception("Finding the pareto front by disjunction optimzation is only implemented for 2 objectives");
         }
         int[] lowerCorner = {objectives[0].getLB(), objectives[1].getLB()};
         int[] upperCorner = {objectives[0].getUB(), objectives[1].getUB()};
@@ -641,7 +649,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
         ArrayList<ParetoFeasibleRegion> possibleFeasibleHyperrectangles = new ArrayList<>();
         possibleFeasibleHyperrectangles.add(initialRegion);
         ref().addStopCriterion(stop);
-        Constraint[] constraintObjectives = new Constraint[((int) Math.pow(2,objectives.length) - 2 + 2 * objectives.length)];
+        // todo create constraints as in the paper
+        Constraint[] constraintObjectives = new Constraint[8];
         boolean timeoutReached = false;
         IntVar objectiveSum = ref().getModel().intVar("objectiveSum", objectives[0].getLB() + objectives[1].getLB(),
                 objectives[0].getUB() + objectives[1].getUB());
@@ -678,7 +687,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 }
                 paretoSolutions.add(solution);
                 // add the 2 new possible feasible regions
-                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoUnsatisfactionFeasibleRegions(feasibleRegion, solutionObjectives);
+                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoImproveAllObjsFeasibleRegions(feasibleRegion, solutionObjectives);
                 possibleFeasibleHyperrectangles.addAll(newFeasibleRegions);
             }
             // reset to the initial state

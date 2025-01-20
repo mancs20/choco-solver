@@ -1,6 +1,7 @@
 package org.chocosolver.examples.integer.experiments;
 
 import org.chocosolver.solver.Solution;
+import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
 
 public class ParetoFrontProcessor {
@@ -8,10 +9,10 @@ public class ParetoFrontProcessor {
     private final int[][] paretoFront;
     private final IntVar[] objectives;
     private final double[][] bounds;
-    private final IntVar[] decisionVariables;
+    private final Object[] decisionVariables;
     private final boolean maximize;
 
-    public ParetoFrontProcessor(Solution[] solutions, IntVar[] modelObjectives, ParetoObjective[] paretoObjectives, IntVar[] decisionVariables, boolean maximize) {
+    public ParetoFrontProcessor(Solution[] solutions, IntVar[] modelObjectives, ParetoObjective[] paretoObjectives, Object[] decisionVariables, boolean maximize) {
         this.solutions = solutions;
         this.objectives = modelObjectives;
         bounds = new double[objectives.length][objectives.length];
@@ -50,12 +51,19 @@ public class ParetoFrontProcessor {
 
     public int[][] getSolutionsParetoFront() {
         int[][] solutionsParetoFront = new int[solutions.length][];
-        for (int i = 0; i < solutions.length; i++) {
-            int[] newParetoPointSolution = new int[decisionVariables.length];
-            for (int j = 0; j < decisionVariables.length; j++) {
-                newParetoPointSolution[j] = solutions[i].getIntVal(decisionVariables[j]);
+        if (decisionVariables !=null && decisionVariables.length != 0) {
+            for (int i = 0; i < solutions.length; i++) {
+                int[] newParetoPointSolution = new int[decisionVariables.length];
+                if (decisionVariables.getClass() == IntVar[].class || decisionVariables.getClass() == BoolVar[].class) {
+                    for (int j = 0; j < decisionVariables.length; j++) {
+                        newParetoPointSolution[j] = solutions[i].getIntVal((IntVar) decisionVariables[j]);
+                    }
+                }else{
+                    System.out.println("Unsupported decision variable type, it should be either IntVar[] or BoolVar[].");
+                    System.exit(1);
+                }
+                solutionsParetoFront[i] = newParetoPointSolution;
             }
-            solutionsParetoFront[i] = newParetoPointSolution;
         }
         return solutionsParetoFront;
     }

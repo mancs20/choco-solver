@@ -1,7 +1,7 @@
 package org.chocosolver.examples.integer.experiments;
 
 import org.chocosolver.examples.integer.Pareto;
-import org.chocosolver.examples.integer.ParetoByUnsatisfaction;
+import org.chocosolver.examples.integer.ParetoImproveAllObjs;
 import org.chocosolver.examples.integer.ParetoSaugmecon;
 import org.chocosolver.examples.integer.experiments.benchmarkreader.ModelObjectivesVariables;
 import org.chocosolver.solver.Model;
@@ -28,13 +28,13 @@ import org.json.JSONObject;
  *     instancePath: the path to the instance file
  *     solverSearchStrategy: the name of the solver search strategy to be used, for now it is "default", but it could "LNS"
  *     solverTimeoutSec: the maximum time in seconds that the solver will run
- *     frontGenerator: the name of the front generator to be used, it could be "ParetoByUnsatisfaction", "ParetoGavanelliGlobalConstraint", "Saugmecon", "ParetoDisjunctiveProgramming"
+ *     frontGenerator: the name of the front generator to be used, it could be "ParetoImproveAllObjs", "ParetoGavanelliGlobalConstraint", "Saugmecon", "SaugmeconFrontVerify", "ParetoDisjunctiveProgramming"
  *     threads: the number of threads to be used, the default is 1
  *
  *     Examples:
- *     vOptLib ukp 2KP50-1A /Users/manuel.combarrosimon/choco-solver/bench/2KP50-1A.dat portfolio 14400 ParetoByUnsatisfaction 6
- *     vOptLib ukp 2KP50-1A ../vOptLib/ukp/2KP50-1A.dat default 14400 ParetoByUnsatisfaction
- *     augmecon2 ukp 100u /Users/manuel.combarrosimon/choco-solver/bench/2KP50-1A.dat default 3600 ParetoByUnsatisfaction
+ *     vOptLib ukp 2KP50-1A /Users/manuel.combarrosimon/choco-solver/bench/2KP50-1A.dat portfolio 14400 ParetoImproveAllObjs 6
+ *     vOptLib ukp 2KP50-1A ../vOptLib/ukp/2KP50-1A.dat default 14400 ParetoImproveAllObjs
+ *     augmecon2 ukp 100u /Users/manuel.combarrosimon/choco-solver/bench/2KP50-1A.dat default 3600 ParetoImproveAllObjs
  *
  */
 
@@ -86,7 +86,7 @@ public class ParetoGenerationExperiments {
             modelAndObjectives = modelAndObjectivesArray[0];
         }
         IntVar[] objectives = modelAndObjectives.getObjectives();
-        IntVar[] decisionVariables = modelAndObjectives.getDecisionVaraibles();
+        Object[] decisionVariables = modelAndObjectives.getDecisionVariables();
         boolean maximization = modelAndObjectives.isMaximization();
 
         ParetoObjective[] originalObjectives = new ParetoObjective[objectives.length];
@@ -147,9 +147,9 @@ public class ParetoGenerationExperiments {
     private static Object[] runFrontStrategy(Model model, IntVar[] objectives, String frontGenerator, boolean maximize, int timeoutSec) {
         model.getSolver().limitTime(timeoutSec + "s");
         switch (frontGenerator) {
-            case "ParetoByUnsatisfaction":
-                ParetoByUnsatisfaction paretoByUnsatisfaction = new ParetoByUnsatisfaction();
-                return paretoByUnsatisfaction.run(model, objectives, maximize, timeoutSec);
+            case "ParetoImproveAllObjs":
+                ParetoImproveAllObjs paretoImproveAllObjs = new ParetoImproveAllObjs();
+                return paretoImproveAllObjs.run(model, objectives, maximize, timeoutSec);
             case "ParetoDisjunctiveProgramming":
                 ParetoDisjunctiveProgramming paretoDisjunctiveProgramming = new ParetoDisjunctiveProgramming();
                 return paretoDisjunctiveProgramming.run(model, objectives, maximize, timeoutSec);
@@ -157,7 +157,10 @@ public class ParetoGenerationExperiments {
                 Pareto pareto = new Pareto();
                 return pareto.run(model, objectives, maximize); // todo add timeout
             case "Saugmecon":
-                ParetoSaugmecon paretoSaugmecon = new ParetoSaugmecon();
+                ParetoSaugmecon paretoSaugmeconLex = new ParetoSaugmecon(true);
+                return paretoSaugmeconLex.run(model, objectives, maximize, timeoutSec);
+            case "SaugmeconFrontVerify":
+                ParetoSaugmecon paretoSaugmecon = new ParetoSaugmecon(false);
                 return paretoSaugmecon.run(model, objectives, maximize, timeoutSec);
             default:
                 throw new IllegalArgumentException("Invalid front generator: " + frontGenerator);
@@ -171,9 +174,9 @@ public class ParetoGenerationExperiments {
 
         //        model.getSolver().limitTime(timeoutSec + "s");
         switch (frontGenerator) {
-            case "ParetoByUnsatisfaction":
-                ParetoByUnsatisfaction paretoByUnsatisfaction = new ParetoByUnsatisfaction();
-                return paretoByUnsatisfaction.runWithPortfolio(modelObjectivesVariables, maximize, timeoutSec);
+            case "ParetoImproveAllObjs":
+                ParetoImproveAllObjs paretoImproveAllObjs = new ParetoImproveAllObjs();
+                return paretoImproveAllObjs.runWithPortfolio(modelObjectivesVariables, maximize, timeoutSec);
 //            case "ParetoGavanelliGlobalConstraint":
 //                Pareto pareto = new Pareto();
 //                return pareto.run(model, objectives, maximize);
@@ -186,7 +189,7 @@ public class ParetoGenerationExperiments {
     }
 
     private static void outputProcessResults(Object[] results, boolean exhaustive, IntVar[] modelObjectives,
-                                             ParetoObjective[] objectives, IntVar[] decisionVariables, boolean maximize) {
+                                             ParetoObjective[] objectives, Object[] decisionVariables, boolean maximize) {
         Map<String, Object> orderedMap = new LinkedHashMap<>();
 
         List<Solution> solutions = (List<Solution>) results[0];
@@ -212,10 +215,8 @@ public class ParetoGenerationExperiments {
         double[][] bounds = paretoFront.getBounds();
         double[] referencePoint = new double[bounds.length];
         int referenceBound = maximize ? 0 : 1;
-        if (maximize){
-            for (int i = 0; i < referencePoint.length; i++) {
-                referencePoint[i] = bounds[i][referenceBound];
-            }
+        for (int i = 0; i < referencePoint.length; i++) {
+            referencePoint[i] = bounds[i][referenceBound];
         }
         orderedMap.put("reference_point", referencePoint);
         JSONObject jsonObject = new JSONObject(orderedMap);
@@ -235,7 +236,7 @@ public class ParetoGenerationExperiments {
         int count = 0; // For calculating averages
 
         String patternString = "Solutions: ([\\d,]+)\\s+"
-                + "(?:MAXIMIZE .+?\\s+)?"
+                + "(?:MAXIMIZE .+?|MINIMIZE .+?)?\\s+"
                 + "Building time : ([\\d.]+)s\\s+"
                 + "Resolution time : ([\\d.,]+)s\\s+"
                 + "(?:Time to best solution : [\\d.,]+s\\s+)?"
@@ -250,7 +251,7 @@ public class ParetoGenerationExperiments {
             Matcher matcher = pattern.matcher(element);
             if (matcher.find()) {
                 totalSolutions += Integer.parseInt(matcher.group(1).replace(",", ""));
-                totalBuildingTime += parseFloatRemoveComma(matcher.group(2));
+                totalBuildingTime = parseFloatRemoveComma(matcher.group(2));
                 totalResolutionTime += parseFloatRemoveComma(matcher.group(3));
                 totalNodes += Integer.parseInt(matcher.group(4).replace(",", ""));
                 averageNodePerSecond += parseFloatRemoveComma(matcher.group(5));

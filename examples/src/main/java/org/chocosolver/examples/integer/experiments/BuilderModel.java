@@ -1,9 +1,6 @@
 package org.chocosolver.examples.integer.experiments;
 
-import org.chocosolver.examples.integer.experiments.benchmarkreader.Augmecon2;
-import org.chocosolver.examples.integer.experiments.benchmarkreader.BenchamarkReader;
-import org.chocosolver.examples.integer.experiments.benchmarkreader.ModelObjectivesVariables;
-import org.chocosolver.examples.integer.experiments.benchmarkreader.vOptLibUKP;
+import org.chocosolver.examples.integer.experiments.benchmarkreader.*;
 
 public class BuilderModel {
     private final BenchamarkReader benchmarkReader;
@@ -13,6 +10,10 @@ public class BuilderModel {
     }
 
     private BenchamarkReader defineBenchmarkReader(Config config) {
+        // check if the benchmark is a flatzinc file, has extension .fzn
+        if (config.getInstancePath().endsWith(".fzn")) {
+            return new FlatZincReader(config);
+        }
         if (config.getBenchmark().contains("augmecon")) {
             return new Augmecon2(config);
         }
