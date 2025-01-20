@@ -24,9 +24,11 @@ import org.chocosolver.solver.constraints.unary.NotMember;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
 import org.chocosolver.solver.objective.ParetoMaximizer;
+import org.chocosolver.solver.objective.ParetoMaximizerUnsatisfaction;
 import org.chocosolver.solver.search.limits.ACounter;
 import org.chocosolver.solver.search.limits.SolutionCounter;
 import org.chocosolver.solver.search.measure.IMeasures;
+import org.chocosolver.solver.search.measure.MeasuresRecorder;
 import org.chocosolver.solver.search.strategy.Search;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.ESat;
@@ -500,6 +502,206 @@ public interface IResolutionHelper extends ISelf<Solver> {
         ref().removeStopCriterion(stop);
         ref().getModel().unpost(c);
         return pareto.getParetoFront();
+    }
+
+
+    /**
+     * todo write description
+     *
+     */
+    default Object[] findParetoFrontByUnsatisfaction(IntVar[] objectives, boolean maximize, float timeout, Criterion... stop) throws Exception {
+        List<Solution> paretoSolutions = new ArrayList<>();
+        List<String> recorderList = new ArrayList<>();
+        if (objectives.length != 2){
+            throw new Exception("Finding the pareto front by unsatisfaction is only implemented for 2 objectives");
+        }
+        int[] lowerCorner = {objectives[0].getLB(), objectives[1].getLB()};
+        int[] upperCorner = {objectives[0].getUB(), objectives[1].getUB()};
+        ParetoFeasibleRegion initialRegion = new ParetoFeasibleRegion(lowerCorner, upperCorner);
+        ArrayList<ParetoFeasibleRegion> possibleFeasibleHyperrectangles = new ArrayList<>();
+        possibleFeasibleHyperrectangles.add(initialRegion);
+        ref().addStopCriterion(stop);
+        ParetoMaximizerUnsatisfaction paretoPoint = new ParetoMaximizerUnsatisfaction(
+                Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new), false
+        );
+        Constraint c = new Constraint("PARETOUNSATISFACTION", paretoPoint);
+        c.post();
+        boolean timeoutReached = false;
+        while (possibleFeasibleHyperrectangles.size() > 0 && !timeoutReached){
+            ParetoFeasibleRegion feasibleRegion;
+            feasibleRegion = getNextPossibleRegion(possibleFeasibleHyperrectangles);
+            paretoPoint.configureInitialUbLb(feasibleRegion);
+            paretoPoint.setLastSolution(null);
+            while (ref().solve()) {
+                paretoPoint.onSolution();
+            }
+            // Get statistics
+            recorderList.add(ref().getMeasures().toString());
+            Solution solution = paretoPoint.getLastFeasibleSolution();
+            if (solution != null){
+                int[] lastObjectives = paretoPoint.getLastObjectiveVal();
+                paretoSolutions.add(solution);
+                // add the 2 new possible feasible regions
+                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoUnsatisfactionFeasibleRegions(feasibleRegion, lastObjectives);
+                possibleFeasibleHyperrectangles.addAll(newFeasibleRegions);
+            }
+            // reset to the initial state
+            //ref().getEnvironment().worldPopUntil(0);
+            if (ref().isStopCriterionMet()){
+                timeoutReached = true;
+            }else{
+                float elapsedTime = ref().getTimeCount();
+                timeout = timeout - elapsedTime;
+                ref().reset();
+                ref().limitTime(timeout + "s");
+            }
+        }
+        ref().getModel().unpost(c);
+        ref().removeStopCriterion(stop);
+        return new Object[]{paretoSolutions, recorderList};
+    }
+
+    default ParetoFeasibleRegion getNextPossibleRegion(ArrayList<ParetoFeasibleRegion> possibleFeasibleHyperrectangles){
+        int idBiggerRegion = getBiggestRegionId(possibleFeasibleHyperrectangles);
+        return possibleFeasibleHyperrectangles.remove(idBiggerRegion);
+    }
+
+    default int getBiggestRegionId(ArrayList<ParetoFeasibleRegion> possibleFeasibleHyperrectangles){
+        int idBiggerRegion = 0;
+        double maxVolume = 0;
+        for (int i = 0; i < possibleFeasibleHyperrectangles.size(); i++) {
+            ParetoFeasibleRegion region = possibleFeasibleHyperrectangles.get(i);
+            double volume = region.getRegionVolume();
+            if (volume > maxVolume){
+                maxVolume = volume;
+                idBiggerRegion = i;
+            }
+        }
+        return idBiggerRegion;
+    }
+
+    default List<ParetoFeasibleRegion> getNewParetoUnsatisfactionFeasibleRegions(ParetoFeasibleRegion feasibleRegion, int[] solutionObjectives){
+        List<ParetoFeasibleRegion> newHyperrectangles = new ArrayList<>();
+        int[] lowerBoundCorner = feasibleRegion.getLowerCorner();
+        int[] upperBoundCorner = feasibleRegion.getUpperCorner();
+
+        // check if there were efficient corners
+        List<int[]> previousEfficientCorners = feasibleRegion.getEfficientCorners();
+        int[][] newEfficientCorners = new int[2][];
+        if (!previousEfficientCorners.isEmpty()){
+            for (int[] efficientCorner:previousEfficientCorners) {
+                // left feasible region
+                if (efficientCorner[0] < solutionObjectives[0]){
+                    newEfficientCorners[0] = efficientCorner;
+                }else{
+                    newEfficientCorners[1] = efficientCorner; // rigth feasible region
+                }
+            }
+        }
+        // 2 feasible regions are produce, left to the solution point and right (the sense is given in the x-axis)
+        ArrayList<int[]> newLowerCorners = new ArrayList<>();
+        newLowerCorners.add(new int[] {lowerBoundCorner[0], solutionObjectives[1]});
+        newLowerCorners.add(new int[] {solutionObjectives[0], lowerBoundCorner[1]});
+        ArrayList<int[]> newUpperCorners = new ArrayList<>();
+        newUpperCorners.add(new int[] {solutionObjectives[0], upperBoundCorner[1]});
+        newUpperCorners.add(new int[] {upperBoundCorner[0], solutionObjectives[1]});
+        for (int i = 0; i < newEfficientCorners.length; i++) {
+            ParetoFeasibleRegion newFeasibleRegion;
+            List<int[]> efficientCorners = new ArrayList<>();
+            efficientCorners.add(solutionObjectives);
+            if (newEfficientCorners[i] != null){
+                efficientCorners.add(newEfficientCorners[i]);
+            }
+            newFeasibleRegion = new ParetoFeasibleRegion(newLowerCorners.get(i),
+                    newUpperCorners.get(i), efficientCorners);
+            newHyperrectangles.add(newFeasibleRegion);
+        }
+
+        return newHyperrectangles;
+    }
+
+
+    /**
+     * todo write description
+     *
+     */
+    // todo is done for 2 objectives and instead of finding the disjucntion as in the paper, it finds the areas as in
+    //  unsatisfaction. The difference is that in unsatisfaction we don't optimize, here we optimize the sum of the
+    //  objectives
+    default Object[] findParetoFrontByDisjunctiveProgramming(IntVar[] objectives, boolean maximize, float timeout,
+                                                             Criterion... stop) throws Exception {
+        List<Solution> paretoSolutions = new ArrayList<>();
+        List<String> recorderList = new ArrayList<>();
+        if (objectives.length != 2){
+            throw new Exception("Finding the pareto front by unsatisfaction is only implemented for 2 objectives");
+        }
+        int[] lowerCorner = {objectives[0].getLB(), objectives[1].getLB()};
+        int[] upperCorner = {objectives[0].getUB(), objectives[1].getUB()};
+        ParetoFeasibleRegion initialRegion = new ParetoFeasibleRegion(lowerCorner, upperCorner);
+        ArrayList<ParetoFeasibleRegion> possibleFeasibleHyperrectangles = new ArrayList<>();
+        possibleFeasibleHyperrectangles.add(initialRegion);
+        ref().addStopCriterion(stop);
+        Constraint[] constraintObjectives = new Constraint[((int) Math.pow(2,objectives.length) - 2 + 2 * objectives.length)];
+        boolean timeoutReached = false;
+        IntVar objectiveSum = ref().getModel().intVar("objectiveSum", objectives[0].getLB() + objectives[1].getLB(),
+                objectives[0].getUB() + objectives[1].getUB());
+        ref().getModel().sum(objectives, "=", objectiveSum).post();
+        while (possibleFeasibleHyperrectangles.size() > 0 && !timeoutReached){
+            ParetoFeasibleRegion feasibleRegion;
+            feasibleRegion = getNextPossibleRegion(possibleFeasibleHyperrectangles);
+            // constraint objectives bounds
+            for (int i = 0; i < objectives.length; i++) {
+                int j = i*2;
+                constraintObjectives[j] = ref().getModel().arithm(objectives[i], ">=", feasibleRegion.getLowerCorner()[i]);
+                constraintObjectives[j].post();
+                constraintObjectives[j+1] = ref().getModel().arithm(objectives[i], "<=", feasibleRegion.getUpperCorner()[i]);
+                constraintObjectives[j+1].post();
+            }
+            // constraint efficient points
+            for (int[] efficientPoint: feasibleRegion.getEfficientCorners()) {
+                for (int i = 0; i < objectives.length; i++) {
+                    constraintObjectives[i + 2 * objectives.length] = ref().getModel().arithm(objectives[i], "!=", efficientPoint[i]);
+                    constraintObjectives[i + 2 * objectives.length].post();
+                }
+            }
+//            paretoPoint.configureInitialUbLb(feasibleRegion);
+//            paretoPoint.setLastSolution(null);
+            Solution solution = findOptimalSolution(objectiveSum, maximize, stop);
+
+
+            // Get statistics
+            recorderList.add(ref().getMeasures().toString());
+            if (solution != null){
+                int[] solutionObjectives = new int[objectives.length];
+                for (int i = 0; i < objectives.length; i++) {
+                    solutionObjectives[i] = solution.getIntVal(objectives[i]);
+                }
+                paretoSolutions.add(solution);
+                // add the 2 new possible feasible regions
+                List<ParetoFeasibleRegion> newFeasibleRegions = getNewParetoUnsatisfactionFeasibleRegions(feasibleRegion, solutionObjectives);
+                possibleFeasibleHyperrectangles.addAll(newFeasibleRegions);
+            }
+            // reset to the initial state
+            //ref().getEnvironment().worldPopUntil(0);
+            if (ref().isStopCriterionMet()){
+                timeoutReached = true;
+            }else{
+                float elapsedTime = ref().getTimeCount();
+                timeout = timeout - elapsedTime;
+                ref().reset();
+                ref().limitTime(timeout + "s");
+            }
+
+            // unpost constraints
+            for (int i = 0; i < constraintObjectives.length; i++) {
+                if (constraintObjectives[i] != null) {
+                    ref().getModel().unpost(constraintObjectives[i]);
+                }
+            }
+        }
+
+        ref().removeStopCriterion(stop);
+        return new Object[]{paretoSolutions, recorderList};
     }
 
     /**
