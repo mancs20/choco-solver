@@ -30,4 +30,6 @@ module org.chocosolver.parsers {
     opens org.chocosolver.parser.dimacs to args4j;
     exports org.chocosolver.parser.handlers;
     opens org.chocosolver.parser.handlers to args4j, org.testng;
+    exports org.chocosolver.parser.flatzinc;
+    exports org.chocosolver.parser.flatzinc.ast;
 }
