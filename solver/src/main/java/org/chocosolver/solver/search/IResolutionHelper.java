@@ -26,6 +26,8 @@ import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
 import org.chocosolver.solver.objective.ParetoMaximizer;
 import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
+//import org.chocosolver.solver.objective.ParetoMaximizerImproveAllObjectives;
+import org.chocosolver.solver.objective.ParetoTestK5050W06;
 import org.chocosolver.solver.search.limits.ACounter;
 import org.chocosolver.solver.search.limits.SolutionCounter;
 import org.chocosolver.solver.search.measure.IMeasures;
@@ -604,6 +606,101 @@ public interface IResolutionHelper extends ISelf<Solver> {
         ref().getModel().unpost(c);
         ref().removeStopCriterion(stop);
         return new Object[]{paretoSolutions, recorderList};
+    }
+
+    // todo delete after test
+    default void testUkpVoptLibK5050W06(IntVar[] objectives, boolean maximize, float timeout, Criterion... stop) throws Exception{
+        // define the regions to search
+        int[][] boundsObj1 = new int[][]{
+                {15901,18278},
+                {18278,23349},
+                {0,15901}};
+        int[][] boundsObj2 = new int[][]{
+                {14103,17621},
+                {0,14103},
+                {17621,21741}};
+
+        // variable for the optimization version
+        int lbSumObj = 0;
+        int ubSumObj = 0;
+        for (int i = 0; i < objectives.length; i++){
+            lbSumObj += objectives[i].getLB();
+            ubSumObj += objectives[i].getUB();
+        }
+
+        // todo uncomment to test with optimization or posting constraints
+//        IntVar sumObj = ref().getModel().intVar("sumObj", lbSumObj, ubSumObj);
+//        ref().getModel().sum(objectives, "=", sumObj).post();
+//--------------------------------------------------------------------------------------------------------------------------------
+
+        // todo uncommet to test with constraint
+        ParetoTestK5050W06 paretoPoint = new ParetoTestK5050W06(objectives);
+        Constraint c = new Constraint("PARETOOPTALLOBJ", paretoPoint);
+        c.post();
+        //--------------------------------------------------------------------------------------------------------------------------------
+
+        int idBounds = 0;
+        while (idBounds < 3){
+            //skip region 1
+//            if (idBounds == 1){
+//                idBounds++;
+//            }
+            // select the region
+            int[] boundObj1Current = boundsObj1[idBounds];
+            int[] boundObj2Current = boundsObj2[idBounds];
+            idBounds++;
+            // set the region constraints
+
+            // todo uncomment to test with optimization or posting constraints
+//            ArrayList<Constraint> regionConstraints = new ArrayList<>();
+//            regionConstraints.add(ref().getModel().arithm(objectives[0], ">", boundObj1Current[0]));
+//            regionConstraints.add(ref().getModel().arithm(objectives[0], "<", boundObj1Current[1]));
+//            regionConstraints.add(ref().getModel().arithm(objectives[1], ">", boundObj2Current[0]));
+//            regionConstraints.add(ref().getModel().arithm(objectives[1], "<", boundObj2Current[1]));
+//            for (Constraint c : regionConstraints){
+//                c.post();
+//            }
+            //--------------------------------------------------------------------------------------------------------------------------------
+
+            // todo uncommet to test with constraint
+            paretoPoint.updateRegions(new int[]{boundObj1Current[0], boundObj2Current[0]},
+                    new int[]{boundObj1Current[1], boundObj2Current[1]});
+
+            boolean solutionFound = false;
+            //--------------------------------------------------------------------------------------------------------------------------------
+
+            // find a solution in the region
+            Solution solution = new Solution(ref().getModel());
+            boolean tryOptimization = false;
+            if (tryOptimization){
+                solutionFound = true;
+                // todo uncomment to test with optimization or posting constraints
+//                solution = findOptimalSolution(sumObj, maximize, stop);
+                //--------------------------------------------------------------------------------------------------------------------------------
+            }else{
+                if (ref().solve()) {
+                    solutionFound = true;
+                    solution.record();
+                }
+            }
+            if (solution != null && solution.exists() && solutionFound){
+                System.out.println("Solution found in region: " + Arrays.toString(boundObj1Current) + " " +
+                        Arrays.toString(boundObj2Current));
+                System.out.println("Objectives values: " + solution.getIntVal(objectives[0]) + " - " +
+                        solution.getIntVal(objectives[1]));
+            }else{
+                System.out.println("No solution found in region: " + Arrays.toString(boundObj1Current) + " " + Arrays.toString(boundObj2Current));
+            }
+            // reset the model
+            ref().reset(); // with hardreset the solution is found
+            // unpost the region constraints
+
+            // todo uncomment to test with optimization or posting constraints
+//            for (Constraint c : regionConstraints){
+//                ref().getModel().unpost(c);
+//            }
+            //--------------------------------------------------------------------------------------------------------------------------------
+        }
     }
 
     default ParetoFeasibleRegion getNextPossibleRegion(ArrayList<ParetoFeasibleRegion> possibleFeasibleHyperrectangles){
