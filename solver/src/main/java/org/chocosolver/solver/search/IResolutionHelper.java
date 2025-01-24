@@ -24,14 +24,16 @@ import org.chocosolver.solver.constraints.unary.Member;
 import org.chocosolver.solver.constraints.unary.NotMember;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
+import org.chocosolver.solver.objective.OptimizationPolicy;
 import org.chocosolver.solver.objective.ParetoMaximizer;
 import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
-//import org.chocosolver.solver.objective.ParetoMaximizerImproveAllObjectives;
 import org.chocosolver.solver.objective.ParetoTestK5050W06;
 import org.chocosolver.solver.search.limits.ACounter;
 import org.chocosolver.solver.search.limits.SolutionCounter;
 import org.chocosolver.solver.search.measure.IMeasures;
 import org.chocosolver.solver.search.strategy.Search;
+import org.chocosolver.solver.search.strategy.assignments.DecisionOperatorFactory;
+import org.chocosolver.solver.search.strategy.decision.IntDecision;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.ESat;
 import org.chocosolver.util.criteria.Criterion;
@@ -43,6 +45,8 @@ import java.util.function.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static org.chocosolver.solver.search.strategy.Search.*;
 
 /**
  * Interface to define most commonly used resolution procedures.
@@ -640,6 +644,13 @@ public interface IResolutionHelper extends ISelf<Solver> {
         //--------------------------------------------------------------------------------------------------------------------------------
 
         int idBounds = 0;
+
+
+//        ref().setSearch(regionStrategy(objectives[0], boundObj1Current[0]+1, true),
+//                regionStrategy(objectives[1], boundObj2Current[0]+1, true),
+//                domOverWDegSearch(ref().getModel().retrieveIntVars(true)));
+
+
         while (idBounds < 3){
             //skip region 1
 //            if (idBounds == 1){
@@ -663,8 +674,30 @@ public interface IResolutionHelper extends ISelf<Solver> {
             //--------------------------------------------------------------------------------------------------------------------------------
 
             // todo uncommet to test with constraint
-            paretoPoint.updateRegions(new int[]{boundObj1Current[0], boundObj2Current[0]},
-                    new int[]{boundObj1Current[1], boundObj2Current[1]});
+//            paretoPoint.updateRegions(new int[]{boundObj1Current[0], boundObj2Current[0]},
+//                    new int[]{boundObj1Current[1], boundObj2Current[1]});
+            int[] lowerBounds = new int[]{boundObj1Current[0] + 1, boundObj2Current[0] +1};
+
+            //push decision variables to the search
+            IntDecision[] decisions = new IntDecision[objectives.length];
+            for (int i = 0; i < objectives.length; i++) {
+                IntDecision dec = ref().getDecisionPath().makeIntDecision(objectives[i], DecisionOperatorFactory.makeIntReverseSplit(), lowerBounds[i]);
+                dec.setRefutable(false);
+                decisions[i] = dec;
+//                ref().getDecisionPath().pushDecision(dec);
+            }
+//            IntDecision dec = ref().getDecisionPath().makeIntDecision(objectives[1], DecisionOperatorFactory.makeIntReverseSplit(), lowerBounds[1]);
+//            dec.setRefutable(false);
+//            ref().getDecisionPath().pushDecision(dec);
+
+
+//            ref().setSearch(regionStrategy(objectives[0], boundObj1Current[0]+1, true),
+//                    regionStrategy(objectives[1], boundObj2Current[0]+1, true),
+//                    domOverWDegSearch(ref().getModel().retrieveIntVars(true)));
+
+//            ref().setSearch(domOverWDegSearch(ref().getModel().retrieveIntVars(true)));
+
+
 
             boolean solutionFound = false;
             //--------------------------------------------------------------------------------------------------------------------------------
@@ -678,21 +711,39 @@ public interface IResolutionHelper extends ISelf<Solver> {
 //                solution = findOptimalSolution(sumObj, maximize, stop);
                 //--------------------------------------------------------------------------------------------------------------------------------
             }else{
+                for (int i = 0; i < decisions.length; i++) {
+                    ref().moveForward(decisions[i]);
+                }
+                paretoPoint.updateRegions(new int[]{boundObj1Current[0], boundObj2Current[0]},
+                        new int[]{boundObj1Current[1], boundObj2Current[1]});
                 if (ref().solve()) {
                     solutionFound = true;
                     solution.record();
                 }
             }
+            System.out.println(ref().getMeasures().toString());
             if (solution != null && solution.exists() && solutionFound){
                 System.out.println("Solution found in region: " + Arrays.toString(boundObj1Current) + " " +
                         Arrays.toString(boundObj2Current));
                 System.out.println("Objectives values: " + solution.getIntVal(objectives[0]) + " - " +
                         solution.getIntVal(objectives[1]));
+
+//                boolean search = ref().moveBackward();
             }else{
                 System.out.println("No solution found in region: " + Arrays.toString(boundObj1Current) + " " + Arrays.toString(boundObj2Current));
             }
+
             // reset the model
             ref().reset(); // with hardreset the solution is found
+//            for (int i = 0; i < decisions.length; i++) {
+            if (solutionFound) {
+                boolean search = ref().moveBackward();
+            }
+            paretoPoint.updateRegions(new int[]{objectives[0].getLB(), objectives[1].getLB()},
+                    new int[]{objectives[0].getUB(), objectives[1].getUB()});
+
+//            }
+//            ref().hardReset();
             // unpost the region constraints
 
             // todo uncomment to test with optimization or posting constraints
