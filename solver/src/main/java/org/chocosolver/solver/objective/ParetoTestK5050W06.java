@@ -4,6 +4,7 @@ import org.chocosolver.solver.constraints.Propagator;
 import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.search.loop.monitors.IMonitorSolution;
+import org.chocosolver.solver.search.strategy.assignments.DecisionOperatorFactory;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.ESat;
 
@@ -49,12 +50,22 @@ public class ParetoTestK5050W06 extends Propagator<IntVar> implements IMonitorSo
 
     @Override
     public void onSolution() {
-
+        for (int i = 0; i < n; i++) {
+            lowerBounds[i] = objectives[i].getValue();
+            upperBounds[i] = objectives[i].getValue();
+        }
     }
 
     public void updateRegions(int[] lowerBounds, int[] upperBounds) {
         this.lowerBounds = lowerBounds;
         this.upperBounds = upperBounds;
+
+//        for (int i = 0; i < objectives.length; i++) {
+//            this.model.getSolver().getDecisionPath().makeIntDecision(objectives[i], DecisionOperatorFactory.makeIntSplit(), upperBounds[i]);
+//            this.model.getSolver().getDecisionPath().makeIntDecision(objectives[i], DecisionOperatorFactory.makeIntReverseSplit(), lowerBounds[i]);
+//        }
+
+
     }
 
 }
