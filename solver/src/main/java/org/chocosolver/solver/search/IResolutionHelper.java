@@ -650,6 +650,17 @@ public interface IResolutionHelper extends ISelf<Solver> {
 //                regionStrategy(objectives[1], boundObj2Current[0]+1, true),
 //                domOverWDegSearch(ref().getModel().retrieveIntVars(true)));
 
+        IntVar[] tempModelVars = ref().getModel().retrieveIntVars(true);
+        IntVar[] notObjectivesVars = new IntVar[tempModelVars.length - objectives.length];
+        int index = 0;
+        for (int i = 0; i < tempModelVars.length; i++) {
+            if (tempModelVars[i] != objectives[0] && tempModelVars[i] != objectives[1]) {
+                notObjectivesVars[index] = tempModelVars[i];
+                index++;
+            }
+        }
+
+        ref().setSearch(Search.domOverWDegSearch(notObjectivesVars), Search.inputOrderLBSearch(objectives));
 
         while (idBounds < 3){
             //skip region 1
@@ -680,9 +691,10 @@ public interface IResolutionHelper extends ISelf<Solver> {
 
             //push decision variables to the search
             IntDecision[] decisions = new IntDecision[objectives.length];
+            boolean refutable = false;
             for (int i = 0; i < objectives.length; i++) {
                 IntDecision dec = ref().getDecisionPath().makeIntDecision(objectives[i], DecisionOperatorFactory.makeIntReverseSplit(), lowerBounds[i]);
-                dec.setRefutable(false);
+                dec.setRefutable(refutable);
                 decisions[i] = dec;
 //                ref().getDecisionPath().pushDecision(dec);
             }
@@ -737,6 +749,14 @@ public interface IResolutionHelper extends ISelf<Solver> {
             ref().reset(); // with hardreset the solution is found
 //            for (int i = 0; i < decisions.length; i++) {
             if (solutionFound) {
+                if (!refutable){
+                    boolean search = ref().moveBackward();
+                } else{
+                    for (int i = 0; i < decisions.length; i++) {
+                        boolean search = ref().moveBackward();
+                    }
+                }
+            }else if(refutable){
                 boolean search = ref().moveBackward();
             }
             paretoPoint.updateRegions(new int[]{objectives[0].getLB(), objectives[1].getLB()},
