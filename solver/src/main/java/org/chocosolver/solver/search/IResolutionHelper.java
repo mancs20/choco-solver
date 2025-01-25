@@ -660,7 +660,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
             }
         }
 
-        ref().setSearch(Search.domOverWDegSearch(notObjectivesVars), Search.inputOrderLBSearch(objectives));
+//        ref().setSearch(Search.domOverWDegSearch(notObjectivesVars), Search.inputOrderLBSearch(objectives));
+        ref().setSearch(Search.domOverWDegRefSearch(notObjectivesVars), Search.minDomLBSearch(objectives));
 
         while (idBounds < 3){
             //skip region 1
