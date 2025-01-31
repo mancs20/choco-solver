@@ -11,13 +11,20 @@ package org.chocosolver.solver.search;
 
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
+import org.chocosolver.solver.constraints.Constraint;
+import org.chocosolver.solver.constraints.PropagatorPriority;
+import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
 import org.chocosolver.solver.search.loop.monitors.IMonitorSolution;
 import org.chocosolver.solver.search.strategy.Search;
+import org.chocosolver.solver.search.strategy.strategy.AbstractStrategy;
+import org.chocosolver.solver.search.strategy.strategy.RegionStrategy;
+import org.chocosolver.solver.search.strategy.strategy.StrategiesSequencer;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.tools.ArrayUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static java.lang.Integer.parseInt;
@@ -154,5 +161,142 @@ public class ParetoTest {
         Assert.assertEquals(26, front.size());
         Assert.assertEquals(233, m.getSolver().getSolutionCount());
         Assert.assertEquals(95208, m.getSolver().getNodeCount());
+    }
+    @Test(groups = "10s")
+    public void testParetoStrategyByRegionWithoutHardReset(){
+        Object[] modelAndObjectives = createConflinctingModelKnapSackExample();
+        Model model = (Model) modelAndObjectives[0];
+        IntVar[] objectives = (IntVar[]) modelAndObjectives[1];
+
+        // define the regions to search
+        int[][] boundsObj1 = new int[][]{
+                {15901,18278},
+                {18278,23349},
+                {0,15901}};
+        int[][] boundsObj2 = new int[][]{
+                {14103,17621},
+                {0,14103},
+                {17621,21741}};
+
+        // variable for the optimization version
+        int obj1UB = objectives[0].getUB();
+        int obj2UB = objectives[1].getUB();
+
+        ParetoMaximizerGIACoverage paretoPoint = new ParetoMaximizerGIACoverage(objectives, false, PropagatorPriority.BINARY);
+        Constraint c = new Constraint("PARETOOPTALLOBJ", paretoPoint);
+        c.post();
+
+        int idBounds = 0;
+
+        //search strategy
+        IntVar[] tempModelVars = model.retrieveIntVars(true);
+        IntVar[] notObjectivesVars = new IntVar[tempModelVars.length - objectives.length];
+        int index = 0;
+        for (int i = 0; i < tempModelVars.length; i++) {
+            if (tempModelVars[i] != objectives[0] && tempModelVars[i] != objectives[1]) {
+                notObjectivesVars[index] = tempModelVars[i];
+                index++;
+            }
+        }
+
+        int[] initialBounds = new int[objectives.length * 2];
+        // IMPORTANT add tge region strategy as the first strategy in the search
+        RegionStrategy regionStrategy = new RegionStrategy(objectives, initialBounds);
+        model.getSolver().setSearch(regionStrategy,
+                Search.domOverWDegRefSearch(notObjectivesVars), Search.domOverWDegRefSearch(objectives));
+        // if restart is used
+        model.getSolver().plugMonitor(regionStrategy);
+
+        while (idBounds < 3){
+            // select the region
+            int[] boundObj1Current = boundsObj1[idBounds];
+            int[] boundObj2Current = boundsObj2[idBounds];
+            int[] lowerBounds = new int[]{boundObj1Current[0] + 1, boundObj2Current[0] +1};
+            int[] upperBounds = new int[]{boundObj1Current[1], boundObj2Current[1]};
+            idBounds++;
+
+            int[] lowerCorner = {boundObj1Current[0] + 1, boundObj2Current[0] +1};
+
+            int[] bounds = new int[objectives.length * 2];
+            for (int i = 0; i < objectives.length; i++){
+                bounds[i] = lowerCorner[i];
+                bounds[i + objectives.length] = upperBounds[i];
+            }
+            int[] boundsLow = new int[objectives.length];
+            System.arraycopy(lowerCorner, 0, boundsLow, 0, objectives.length);
+
+            // IMPORTANT add the new bounds in every loop like this to avoid adding the search again.
+            AbstractStrategy usedSearch = model.getSolver().getSearch();
+            if (usedSearch instanceof StrategiesSequencer) {
+                AbstractStrategy firstSearch = ((StrategiesSequencer) usedSearch).getStrategies()[0];
+                if (firstSearch instanceof RegionStrategy) {
+                    ((RegionStrategy) firstSearch).setBounds(bounds);
+                }
+            }
+
+            ParetoFeasibleRegion feasibleRegion = new ParetoFeasibleRegion(new int[]{0,0}, new int[]{obj1UB, obj2UB});
+            paretoPoint.configureInitialUbLb(feasibleRegion);
+
+            boolean solutionFound = false;
+            paretoPoint.setLastSolution(null);
+            Solution solution = new Solution(model);
+
+            while (model.getSolver().solve()) {
+                paretoPoint.onSolution();
+                solution.record();
+                solutionFound = true;
+            }
+            // Get statistics
+            System.out.println(model.getSolver().getMeasures().toString());
+            if (solutionFound){
+                System.out.println("Solution found in region: " + Arrays.toString(boundObj1Current) + " " +
+                        Arrays.toString(boundObj2Current));
+                System.out.println("Objectives values: " + solution.getIntVal(objectives[0]) + " - " +
+                        solution.getIntVal(objectives[1]));
+            }else{
+                System.out.println("No solution found in region: " + Arrays.toString(boundObj1Current) + " " + Arrays.toString(boundObj2Current));
+                Assert.assertEquals(lowerCorner, new int[]{18279, 1}); // Here is in the only region that we should not find a solution
+            }
+
+            model.getSolver().reset();
+        }
+    }
+
+    private Object[] createConflinctingModelKnapSackExample() {
+        int[] nbItems; // number of items for each type
+        nbItems = new int[50];
+        for (int i = 0; i < 50; i++) {
+            nbItems[i] = 1;
+        }
+        int[] weights = new int[]{62, 300, 670, 372, 535, 162, 985, 952, 562, 417, 2, 817, 554, 9, 128, 619, 934, 805, 100, 334, 149, 668,
+                647, 164, 709, 421, 838, 659, 152, 563, 134, 60, 374, 317, 478, 419, 807, 220, 511, 986, 928, 82, 841, 608, 874, 72, 458, 969, 912, 314};
+        int[] obj1Coeff = new int[]{684, 45, 678, 805, 478, 549, 302, 485, 788, 623, 652, 583, 682, 641, 320, 258, 49, 402, 79, 123, 759, 563, 328,
+                531, 400, 985, 889, 121, 130, 329, 618, 113, 224, 451, 512, 761, 577, 273, 753, 217, 881, 714, 889, 114, 391, 100, 471, 44, 751, 234};
+        int[] obj2Coeff = new int[]{168, 547, 584, 513, 978, 417, 914, 225, 226, 65, 58, 519, 708, 429, 117, 213, 37, 69, 693, 734, 507, 279, 163,
+                8, 321, 177, 978, 473, 712, 274, 665, 392, 778, 336, 18, 673, 58, 495, 460, 725, 285, 902, 859, 143, 171, 167, 732, 581, 926, 269};
+
+        int knapsackCapacity = 11674;
+
+        Model model = new Model("MultiObjKnapsackVoptLibK5050W06");
+
+        // For each type, we create a variable for the number of occurrences
+        IntVar[] occurrences = new IntVar[nbItems.length];
+        for (int i = 0; i < nbItems.length; i++) {
+            occurrences[i] = model.intVar(0, 1);
+        }
+
+        // model variables
+        IntVar weight = model.intVar(0, knapsackCapacity);
+        int obj1UB = Arrays.stream(obj1Coeff).sum();
+        int obj2UB = Arrays.stream(obj2Coeff).sum();
+        IntVar obj1 = model.intVar(0, obj1UB);
+        IntVar obj2 = model.intVar(0, obj2UB);
+        IntVar[] objectives = new IntVar[]{obj1, obj2};
+
+        // We add two knapsack constraints to the solver
+        // Beware : call the post() method to save it
+        model.knapsack(occurrences, weight, obj1, weights, obj1Coeff).post();
+        model.knapsack(occurrences, weight, obj2, weights, obj2Coeff).post();
+        return new Object[]{model, objectives};
     }
 }
