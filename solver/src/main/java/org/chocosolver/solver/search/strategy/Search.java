@@ -635,8 +635,8 @@ public class Search {
         return new ObjectiveStrategy(objective, optPolicy);
     }
 
-    public static AbstractStrategy<IntVar> regionStrategy(IntVar objective, int bound, boolean isLowerBound) {
-        return new RegionStrategy(objective, bound, isLowerBound);
+    public static AbstractStrategy<IntVar> regionStrategy(IntVar[] objectives, int[] bounds) {
+        return new RegionStrategy(objectives, bounds);
     }
 
     // ************************************************************************************

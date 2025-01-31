@@ -16,6 +16,11 @@ import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
 import org.chocosolver.solver.search.loop.monitors.IMonitorSolution;
 import org.chocosolver.solver.search.strategy.Search;
+import org.chocosolver.solver.search.strategy.assignments.DecisionOperatorFactory;
+import org.chocosolver.solver.search.strategy.decision.Decision;
+import org.chocosolver.solver.search.strategy.strategy.AbstractStrategy;
+import org.chocosolver.solver.search.strategy.strategy.RegionStrategy;
+import org.chocosolver.solver.search.strategy.strategy.StrategiesSequencer;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.tools.ArrayUtils;
 import org.testng.Assert;
@@ -197,6 +202,14 @@ public class ParetoTest {
             }
         }
 
+        int[] initialBounds = new int[objectives.length * 2];
+        // IMPORTANT add tge region strategy as the first strategy in the search
+        RegionStrategy regionStrategy = new RegionStrategy(objectives, initialBounds);
+        model.getSolver().setSearch(regionStrategy,
+                Search.domOverWDegRefSearch(notObjectivesVars), Search.domOverWDegRefSearch(objectives));
+        // if restart is used
+        model.getSolver().plugMonitor(regionStrategy);
+
         while (idBounds < 3){
             // select the region
             int[] boundObj1Current = boundsObj1[idBounds];
@@ -217,13 +230,16 @@ public class ParetoTest {
                 boundsLow[i] = lowerCorner[i];
             }
 
-//            model.getSolver().setSearch(Search.regionStrategy(objectives, boundsLow),
-//                    Search.domOverWDegRefSearch(notObjectivesVars), Search.domOverWDegRefSearch(objectives));
-            model.getSolver().setSearch(Search.regionStrategy(objectives, bounds),
-                    Search.domOverWDegRefSearch(notObjectivesVars), Search.domOverWDegRefSearch(objectives));
+            // IMPORTANT add the new bounds in every loop like this to avoid adding the search again.
+            AbstractStrategy usedSearch = model.getSolver().getSearch();
+            if (usedSearch instanceof StrategiesSequencer) {
+                AbstractStrategy firstSearch = ((StrategiesSequencer) usedSearch).getStrategies()[0];
+                if (firstSearch instanceof RegionStrategy) {
+                    ((RegionStrategy) firstSearch).setBounds(bounds);
+                }
+            }
 
             ParetoFeasibleRegion feasibleRegion = new ParetoFeasibleRegion(new int[]{0,0}, new int[]{obj1UB, obj2UB});
-//            ParetoFeasibleRegion feasibleRegion = new ParetoFeasibleRegion(lowerBounds, upperBounds);
             paretoPoint.configureInitialUbLb(feasibleRegion);
 
             boolean solutionFound = false;

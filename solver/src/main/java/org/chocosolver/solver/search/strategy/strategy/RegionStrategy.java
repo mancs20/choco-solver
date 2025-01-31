@@ -15,10 +15,11 @@ public class RegionStrategy extends AbstractStrategy<IntVar> implements IMonitor
     // VARIABLES
     //***********************************************************************************
 
-    private final int[] bounds;
+    private int[] bounds;
     private boolean isLowerBound;
 
     private final IntVar[] objs;
+    private final int[] originalBounds;
     private int idxObjsDecision = 0;
     private boolean fullBounded = false;
 
@@ -33,6 +34,7 @@ public class RegionStrategy extends AbstractStrategy<IntVar> implements IMonitor
     public RegionStrategy(IntVar[] objectives, int[] bounds) {
         super(objectives);
         this.objs = objectives;
+
         this.bounds = bounds;
         this.model = objs[0].getModel();
         if (objs.length != bounds.length && 2*objs.length != bounds.length) {
@@ -40,6 +42,13 @@ public class RegionStrategy extends AbstractStrategy<IntVar> implements IMonitor
         }
         if (bounds.length == 2*objs.length) {
             fullBounded = true;
+        }
+        originalBounds = new int[bounds.length];
+        for (int i = 0; i < objs.length; i++) {
+            originalBounds[i] = objectives[i].getLB();
+            if (fullBounded) {
+                originalBounds[i + objs.length] = objectives[i].getUB();
+            }
         }
         isLowerBound = true;
     }
@@ -64,20 +73,22 @@ public class RegionStrategy extends AbstractStrategy<IntVar> implements IMonitor
 
     @Override
     public Decision<IntVar> getDecision() {
-        if (idxObjsDecision >= objs.length) {
-            isLowerBound = false;
-            if (fullBounded) {
-                if (idxObjsDecision >= 2*objs.length) {
-                    return null;
+        isLowerBound = true;
+        if (fullBounded) {
+            if (idxObjsDecision >= objs.length) {
+                if (idxObjsDecision < 2*objs.length) {
+                    isLowerBound = false;
+                } else {
+                    idxObjsDecision = 0;
                 }
-                decOperator = getOperator(false);
-                return computeDecision(objs[idxObjsDecision % objs.length]);
-            } else{
-                return null;
             }
-        } else{
-            return computeDecision(objs[idxObjsDecision]);
+        } else {
+            if (idxObjsDecision >= objs.length) {
+                idxObjsDecision = 0;
+            }
         }
+        decOperator = getOperator(isLowerBound);
+        return computeDecision(objs[idxObjsDecision % objs.length]);
     }
 
     @Override
@@ -112,5 +123,20 @@ public class RegionStrategy extends AbstractStrategy<IntVar> implements IMonitor
         }
         dec.setRefutable(false);
         return dec;
+    }
+
+    public int[] getBounds() {
+        return bounds;
+    }
+
+    public void setBounds(int[] bounds) {
+        this.bounds = bounds;
+        idxObjsDecision = 0;
+    }
+
+    @Override
+    public void afterRestart() {
+        idxObjsDecision = 0;
+        bounds = originalBounds.clone();
     }
 }
