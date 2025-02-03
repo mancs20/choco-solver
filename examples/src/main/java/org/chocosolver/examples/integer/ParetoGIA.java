@@ -23,6 +23,7 @@ import org.chocosolver.solver.Solver;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.objective.GiaConfig;
+import org.chocosolver.solver.objective.IMultiObjectiveManager;
 import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
 import org.chocosolver.solver.objective.ParetoMaximizerGIAGeneral;
 import org.chocosolver.solver.search.ParetoFeasibleRegion;
@@ -40,7 +41,7 @@ import java.util.stream.Stream;
  */
 
 
-abstract public class ParetoGIA implements TimeoutHolder {
+abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager {
     protected GiaConfig config;
     protected int numObjectivesAllowed;
     protected Model model;
@@ -141,14 +142,7 @@ abstract public class ParetoGIA implements TimeoutHolder {
             if (solver.isStopCriterionMet() || ((config.getCriteriaSelection() == GiaConfig.CriteriaSelection.NONE) && solution == null)) {
                 stopCondition = true;
             } else {
-                if (solution != null) {
-                    // todo try to find a better way to reset the model, hardreset makes slower the next search.
-                    //  This has to be done because in some cases (knapsack) after a combination feasible, then infeasible,
-                    //  the following area could result infeasible even if in reality was feasible.
-                    solver.hardReset();
-                } else {
-                    solver.reset();
-                }
+                solver.reset(); // if reset is does not work, use the search strategy regionSearch
             }
             paretoPoint.prepareGIAMaximizerForNextSolution();
         }

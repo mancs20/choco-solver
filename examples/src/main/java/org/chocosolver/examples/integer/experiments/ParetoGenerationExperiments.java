@@ -7,6 +7,7 @@ import org.chocosolver.examples.integer.experiments.benchmarkreader.ModelObjecti
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.objective.GiaConfig;
+import org.chocosolver.solver.objective.IMultiObjectiveManager;
 import org.chocosolver.solver.variables.IntVar;
 
 import java.util.*;
@@ -38,7 +39,7 @@ import org.json.JSONObject;
  *
  */
 
-public class ParetoGenerationExperiments {
+public class ParetoGenerationExperiments implements IMultiObjectiveManager {
     public static void main(String[] args) {
         if (args.length < 7) {
             System.out.println("Usage: java <benchmark> <problem> <instanceName> <instancePath> <solverSearchStrategy>" +
@@ -99,6 +100,7 @@ public class ParetoGenerationExperiments {
         boolean exhaustive = true;
         if (portfolioSize == 1) {
             Model model = modelAndObjectives.getModel();
+            IMultiObjectiveManager.setDefaultSearchMultiObjective(model, objectives, modelAndObjectives.getDecisionVariablesSearch());
             results = runFrontStrategy(model, objectives, frontGenerator, maximization, config.getSolverTimeoutSec());
             if (model.getSolver().isStopCriterionMet()){
                 System.out.println("Solver time limit reached");

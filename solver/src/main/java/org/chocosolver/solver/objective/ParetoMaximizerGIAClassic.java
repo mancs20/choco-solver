@@ -4,6 +4,7 @@ import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.variables.IntVar;
+import org.chocosolver.solver.variables.events.IntEventType;
 import org.chocosolver.util.ESat;
 
 public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
@@ -56,12 +57,10 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
         return saveSolution;
     }
 
-//    todo verify for other problems if it is better to use the propagation condition or not, for the test case it is
-//     better NOT to use it
-    //@Override
-//    public int getPropagationConditions(int vIdx) {
-//        return IntEventType.boundAndInst();
-//    }
+    @Override
+    public int getPropagationConditions(int vIdx) {
+        return IntEventType.boundAndInst();
+    }
 
     @Override
     public void propagate(int evtmask) throws ContradictionException {
@@ -78,8 +77,8 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
     private void verifyLowestUpperBound() throws ContradictionException {
         for (int i = 0; i < objectives.length; i++) {
-            if (objectives[i].getUB() > lowestUpperBounds[i]) {
-                objectives[i].updateUpperBound(lowestUpperBounds[i], this);
+            if (objectives[i].getUB() > highestCurrentUpperBounds[i]) {
+                objectives[i].updateUpperBound(highestCurrentUpperBounds[i], this);
             }
         }
     }
@@ -147,17 +146,9 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
     }
 
     private void computeLowestUpperBound(int i) throws ContradictionException {
-        int lowestUpperBound = Integer.MAX_VALUE;
         int[] dominatingPoint = computeDominatingPoint(i);
         // TODO check the point quad tree representation in the paper to avoid iterating over all the solutions
-        for (int[] sol : paretoFront) {
-            if (dominates(dominatingPoint, sol)) {
-                int currentPoint = sol[i] - 1;
-                if (lowestUpperBound > currentPoint) {
-                    lowestUpperBound = currentPoint;
-                }
-            }
-        }
+        int lowestUpperBound = computeLowestUBToAvoidDomination(dominatingPoint, i);
         if (lowestUpperBound < Integer.MAX_VALUE) {
             objectives[i].updateUpperBound(lowestUpperBound, this);
         }

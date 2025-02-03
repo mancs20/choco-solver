@@ -36,7 +36,7 @@ public class FlatZincReader extends BenchamarkReader{
                             "called objs in the minizinc model file");
                     System.exit(1);
                 }
-                Object[] decisionVariables = null;
+                IntVar[] decisionVariables = null;
                 if(datas[0].get("decision_vars") != null) {
                     if (datas[0].get("decision_vars").getClass() == IntVar[].class ||
                             datas[0].get("decision_vars").getClass() == BoolVar[].class) {

@@ -25,7 +25,8 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
 
     protected Solution lastSolution;
     protected int[] lastObjectiveVal;
-    protected int[] lowestUpperBounds;
+    protected int[] highestCurrentUpperBounds;
+    protected int[] originalUpperBounds;
     // --------------------------------------------------------
 
 
@@ -38,9 +39,13 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
         this.portfolio = portfolio;
         this.boundedType = GiaConfig.BoundedType.DOMINATING_REGION;
         lastObjectiveVal = new int[n];
-        lowestUpperBounds = new int[n];
+        highestCurrentUpperBounds = new int[n];
         this.findingFirstPoint = true;
         this.paretoFront = new ArrayList<>();
+        originalUpperBounds = new int[n];
+        for (int i = 0; i < n; i++) {
+            originalUpperBounds[i] = objectives[i].getUB();
+        }
     }
 
     public void setBoundedType(GiaConfig.BoundedType boundedType) {
@@ -60,7 +65,7 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
             if (objectives[i].getLB() < lastObjectiveVal[i]){
                 // the line below cause contradiction if the lower bound cannot take a value equal or bigger than the last solution
                 objectives[i].updateLowerBound(lastObjectiveVal[i], this);
-            }else if (objectives[i].getLB() > lastObjectiveVal[i]){ // todo never set the propagator as passive until the problem is fixed, check the todo in setPassive()
+            }else if (objectives[i].getLB() > lastObjectiveVal[i]){
                 someLBBiggerThanLastSolution = true;
             }
         }
@@ -90,12 +95,11 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
             }else{
                 fails();
             }
-        }//else{
-        // all lower bounds are bigger than the last solution
-        // todo check why is not working. For the instance vOptLib--ukp--2KP50-1A after lastObjectiveVal[0] == 877 && lastObjectiveVal[1] == 926, the propagator is set to passive and
-        //  the next solution found is 890,949, but after that the propagator keeps inactive and a new solution is found with values 887, 995 which violates the constraint
-        //this.setPassive();
-        //}
+        } else{
+            // all lower bounds are equal or greater than the last solution with at least one lower bound greater than
+            // the last solution
+            this.setPassive();
+        }
     }
 
     protected void computeDominatedAreaSimple() throws ContradictionException {
@@ -107,7 +111,7 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
                 // the line below cause contradiction if the lower bound cannot take a value equal or bigger than the last solution
                 objectives[i].updateLowerBound(lastObjectiveVal[i], this);
             }
-            if (objectives[i].getUB() > lastObjectiveVal[i]) { // todo never set the propagator as passive until the problem is fixed, check the todo in setPassive()
+            if (objectives[i].getUB() > lastObjectiveVal[i]) {
                 someUBBiggerThanLastSolution = true;
             }
         }
@@ -118,29 +122,33 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
     }
 
     protected void setLowestUpperBound(){
-        lowestUpperBounds = new int[n];
+        highestCurrentUpperBounds = new int[n];
         for (int i = 0; i < n; i++) {
-            lowestUpperBounds[i] = computeLowestUpperBoundWithLastObjectiveVal(i);
+            highestCurrentUpperBounds[i] = computeLowestUpperBoundWithLastObjectiveVal(i);
         }
     }
 
     private int computeLowestUpperBoundWithLastObjectiveVal(int i){
-        int lowestUpperBound = Integer.MAX_VALUE;
         int[] dominatingPoint = computeDominatingPointLastObjectiveVal(i);
+        return computeLowestUBToAvoidDomination(dominatingPoint, i);
+    }
+
+    protected int computeLowestUBToAvoidDomination(int[] dominatingPoint, int i) {
+        int highestPossibleUpperBound = Integer.MAX_VALUE;
         for (int[] sol : paretoFront) {
             if (dominates(dominatingPoint, sol)) {
                 int currentPoint = sol[i] - 1;
-                if (lowestUpperBound > currentPoint) {
-                    lowestUpperBound = currentPoint;
+                if (highestPossibleUpperBound > currentPoint) {
+                    highestPossibleUpperBound = currentPoint;
                 }
             }
         }
-        return lowestUpperBound;
+        return highestPossibleUpperBound;
     }
 
     private int[] computeDominatingPointLastObjectiveVal(int i) {
         int[] dp = lastObjectiveVal.clone();
-        dp[i] = Integer.MAX_VALUE;
+        dp[i] = originalUpperBounds[i];
         return dp;
     }
 
