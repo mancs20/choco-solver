@@ -162,6 +162,7 @@ public class ParetoTest {
         Assert.assertEquals(233, m.getSolver().getSolutionCount());
         Assert.assertEquals(95208, m.getSolver().getNodeCount());
     }
+
     @Test(groups = "10s")
     public void testParetoStrategyByRegionWithoutHardReset(){
         Object[] modelAndObjectives = createConflinctingModelKnapSackExample();
