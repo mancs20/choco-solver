@@ -55,9 +55,7 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
     private void verifyLowestUpperBound() throws ContradictionException {
         for (int i = 0; i < objectives.length; i++) {
-            if (objectives[i].getUB() > highestCurrentUpperBounds[i]) {
-                objectives[i].updateUpperBound(highestCurrentUpperBounds[i], this);
-            }
+            objectives[i].updateUpperBound(highestCurrentUpperBounds[i], this);
         }
     }
 
@@ -86,13 +84,9 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
     private void computeTightestPoint(int i) throws ContradictionException {
         int tightestPoint = Integer.MIN_VALUE;
         int[] dominatedPoint = computeDominatedPoint(i);
-
-
 //        int[] minBoundary = new int[]{Integer.MIN_VALUE, Integer.MIN_VALUE};
         // Check if the new point is dominated and update boundaries
 //        boolean isDominated = paretoTree.isDominated(dominatedPoint, minBoundary);
-
-
         // TODO check the point quad tree representation in the paper to avoid iterating over all the solutions
         for (int[] sol : paretoFront) {
             if (dominates(sol, dominatedPoint)) {
@@ -127,7 +121,7 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
         int[] dominatingPoint = computeDominatingPoint(i);
         // TODO check the point quad tree representation in the paper to avoid iterating over all the solutions
         int lowestUpperBound = computeLowestUBToAvoidDomination(dominatingPoint, i);
-        if (lowestUpperBound < Integer.MAX_VALUE) {
+        if (lowestUpperBound <  originalUpperBounds[i]) {
             objectives[i].updateUpperBound(lowestUpperBound, this);
         }
     }

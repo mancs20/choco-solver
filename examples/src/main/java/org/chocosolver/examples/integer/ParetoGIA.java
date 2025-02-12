@@ -106,11 +106,12 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
 
     private void configureSearch(){
         int[] initialBounds;
-        if (config.getBounded() == GiaConfig.BoundedType.DOMINATING_REGION){
-            initialBounds = new int[objectives.length];
-        } else {
-            initialBounds = new int[objectives.length * 2];
-        }
+//        if (config.getBounded() == GiaConfig.BoundedType.DOMINATING_REGION){
+//            initialBounds = new int[objectives.length];
+//        } else {
+//            initialBounds = new int[objectives.length * 2];
+//        }
+        initialBounds = new int[objectives.length];
 
         // Constraint to be used when we use the search strategy to find the improved point
         int minSum = Arrays.stream(objectives).mapToInt(IntVar::getLB).sum();

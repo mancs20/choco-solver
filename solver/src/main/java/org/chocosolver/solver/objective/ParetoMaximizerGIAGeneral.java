@@ -134,7 +134,7 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
     }
 
     protected int computeLowestUBToAvoidDomination(int[] dominatingPoint, int i) {
-        int highestPossibleUpperBound = Integer.MAX_VALUE;
+        int highestPossibleUpperBound = originalUpperBounds[i];
         for (int[] sol : paretoFront) {
             if (dominates(dominatingPoint, sol)) {
                 int currentPoint = sol[i] - 1;
