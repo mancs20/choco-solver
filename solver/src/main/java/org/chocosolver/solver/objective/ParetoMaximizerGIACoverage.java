@@ -152,6 +152,10 @@ public class ParetoMaximizerGIACoverage extends ParetoMaximizerGIAGeneral {
         setLastSolution(null);
     }
 
+    public void prepareGIAMaximizerForNextSolution(int[] newParetoPointToAdd){
+
+    }
+
     public void configureInitialUbLb(ParetoFeasibleRegion feasible_region){
         this.lastObjectiveVal = feasible_region.getLowerCorner().clone();
         this.upperRegionCorner = feasible_region.getUpperCorner().clone();

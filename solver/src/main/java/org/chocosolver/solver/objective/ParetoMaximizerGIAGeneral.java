@@ -180,6 +180,8 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
 
     public abstract void prepareGIAMaximizerForNextSolution();
 
+    public abstract void prepareGIAMaximizerForNextSolution(int[] newParetoPointToAdd);
+
     public abstract void prepareGIAMaximizerFirstSolution();
 
     public Solution getLastFeasibleSolution() {

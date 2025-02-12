@@ -27,7 +27,11 @@ import org.chocosolver.solver.objective.IMultiObjectiveManager;
 import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
 import org.chocosolver.solver.objective.ParetoMaximizerGIAGeneral;
 import org.chocosolver.solver.search.ParetoFeasibleRegion;
+import org.chocosolver.solver.search.strategy.strategy.AbstractStrategy;
+import org.chocosolver.solver.search.strategy.strategy.GIARegionStrategy;
+import org.chocosolver.solver.search.strategy.strategy.StrategiesSequencer;
 import org.chocosolver.solver.variables.IntVar;
+import org.chocosolver.solver.variables.Variable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,6 +58,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
     protected int[] lastObjectiveValues;
     protected boolean stopCondition;
     protected long startTimeNano;
+    protected GIARegionStrategy giaRegionStrategy;
 
     public ParetoGIA(GiaConfig config, int timeout) {
         this.config = config;
@@ -72,7 +77,9 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         } catch (Exception e) {
             e.printStackTrace();
         }
+        @SuppressWarnings("unchecked")
         List<Solution> solutions = (List<Solution>) solutionsAndStats[0];
+        @SuppressWarnings("unchecked")
         List<String> stats = (List<String>) solutionsAndStats[1];
 
         return new Object[]{solutions, stats};
@@ -92,6 +99,31 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1);
+        }
+        // set search strategy
+        configureSearch();
+    }
+
+    private void configureSearch(){
+        int[] initialBounds;
+        if (config.getBounded() == GiaConfig.BoundedType.DOMINATING_REGION){
+            initialBounds = new int[objectives.length];
+        } else {
+            initialBounds = new int[objectives.length * 2];
+        }
+
+        // Constraint to be used when we use the search strategy to find the improved point
+        int minSum = Arrays.stream(objectives).mapToInt(IntVar::getLB).sum();
+        int maxSum = Arrays.stream(objectives).mapToInt(IntVar::getUB).sum();
+        IntVar objsSum = model.intVar("objsSum", minSum+1, maxSum+1);
+        model.sum(objectives, ">", objsSum).post();
+
+        giaRegionStrategy = new GIARegionStrategy(this.objectives, initialBounds, objsSum);
+        AbstractStrategy<Variable> usedSearch = model.getSolver().getSearch();
+        if (usedSearch == null) {
+            model.getSolver().setSearch(giaRegionStrategy);
+        } else {
+            model.getSolver().setSearch(giaRegionStrategy, usedSearch);
         }
     }
 
@@ -115,8 +147,47 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
     protected boolean getFrontPoint(){
         timeout = updateSolverTimeoutCurrentTime(solver, timeout, startTimeNano);
         boolean foundSolution = false;
+        Solution solution = null;
+        AbstractStrategy<Variable> usedSearch = model.getSolver().getSearch();
         try {
+            for (int i = 0; i < objectives.length; i++) {
+                lastObjectiveValues[i] = objectives[i].getLB();
+            }
+            boolean updateLastObjectiveValues;
+
+            // giaRegionStrategy should be applied only after a solution is found using the gavanelli propagator
+            giaRegionStrategy.setReturnDecision(false);
             while(solver.solve()){
+                // obtain a solution using gavanelli propagator, then only find solutions that can dominate the current solution
+                int sumObjectives = 0;
+                updateLastObjectiveValues = true;
+                for (int i = 0; i <  objectives.length; i++) {
+                    if (lastObjectiveValues[i] > objectives[i].getValue()){
+                        updateLastObjectiveValues = false;
+                        break;
+                    }
+                }
+                if (updateLastObjectiveValues) {
+                    for (int i = 0; i < objectives.length; i++) {
+                        lastObjectiveValues[i] = objectives[i].getValue();
+                    }
+                    solution = new Solution(model);
+                    solution.record();
+                }
+                for (int lastObjectiveValue : lastObjectiveValues) {
+                    sumObjectives += lastObjectiveValue;
+                }
+                sumObjectives++;
+                // configure the search strategy to find the improved point, after obtaining the initial solution using gavanelli propagator only
+                if (!foundSolution){
+                    giaRegionStrategy.setReturnDecision(true);
+                }
+                if (usedSearch instanceof StrategiesSequencer) {
+                    AbstractStrategy<?> firstSearch = ((StrategiesSequencer<?>) usedSearch).getStrategies()[0];
+                    if (firstSearch instanceof GIARegionStrategy) {
+                        ((GIARegionStrategy) firstSearch).configureSearchToDominatePoint(lastObjectiveValues, sumObjectives);
+                    }
+                }
                 paretoPoint.onSolution();
                 foundSolution = true;
             }
@@ -133,18 +204,16 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
             e.printStackTrace();
         }
         if (foundSolution) {
-            Solution solution = paretoPoint.getLastFeasibleSolution();
             if (solution != null) {
-                lastObjectiveValues = paretoPoint.getLastObjectiveVal();
                 paretoSolutions.add(solution);
             }
             // reset to the initial state
             if (solver.isStopCriterionMet() || ((config.getCriteriaSelection() == GiaConfig.CriteriaSelection.NONE) && solution == null)) {
                 stopCondition = true;
             } else {
-                solver.reset(); // if reset is does not work, use the search strategy regionSearch
+                solver.reset();
             }
-            paretoPoint.prepareGIAMaximizerForNextSolution();
+            paretoPoint.prepareGIAMaximizerForNextSolution(lastObjectiveValues);
         }
         return foundSolution;
     }
@@ -157,7 +226,9 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         } catch (Exception e) {
             e.printStackTrace();
         }
+        @SuppressWarnings("unchecked")
         List<Solution> solutions = (List<Solution>) solutionsAndStats[0];
+        @SuppressWarnings("unchecked")
         List<String> stats = (List<String>) solutionsAndStats[1];
 
         return new Object[]{solutions, stats};
@@ -178,7 +249,9 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         }
         long endTime = System.nanoTime();
         float elapsedTime = (float) (endTime - startTime) / 1_000_000_000;
+        @SuppressWarnings("unchecked")
         List<Solution> solutions = (List<Solution>) solutionsAndStats[0];
+        @SuppressWarnings("unchecked")
         List<String> stats = (List<String>) solutionsAndStats[1];
 
         return new Object[]{solutions, stats, elapsedTime};

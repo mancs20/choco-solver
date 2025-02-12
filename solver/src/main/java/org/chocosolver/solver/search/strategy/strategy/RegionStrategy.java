@@ -15,16 +15,16 @@ public class RegionStrategy extends AbstractStrategy<IntVar> implements IMonitor
     // VARIABLES
     //***********************************************************************************
 
-    private int[] bounds;
-    private boolean isLowerBound;
+    protected int[] bounds;
+    protected boolean isLowerBound;
 
-    private final IntVar[] objs;
-    private final int[] originalBounds;
-    private int idxObjsDecision = 0;
-    private boolean fullBounded = false;
+    protected final IntVar[] objs;
+    protected final int[] originalBounds;
+    protected int idxObjsDecision;
+    protected boolean fullBounded = false;
 
-    private final Model model;
-    private DecisionOperator<IntVar> decOperator;
+    protected final Model model;
+    protected DecisionOperator<IntVar> decOperator;
 
     /**
      *
@@ -34,6 +34,7 @@ public class RegionStrategy extends AbstractStrategy<IntVar> implements IMonitor
     public RegionStrategy(IntVar[] objectives, int[] bounds) {
         super(objectives);
         this.objs = objectives;
+        idxObjsDecision = 0;
 
         this.bounds = bounds;
         this.model = objs[0].getModel();
@@ -53,7 +54,7 @@ public class RegionStrategy extends AbstractStrategy<IntVar> implements IMonitor
         isLowerBound = true;
     }
 
-     private DecisionOperator<IntVar> getOperator(boolean isLowerBound) {
+     protected DecisionOperator<IntVar> getOperator(boolean isLowerBound) {
         return isLowerBound ? DecisionOperatorFactory.makeIntReverseSplit() : DecisionOperatorFactory.makeIntSplit();
     }
 

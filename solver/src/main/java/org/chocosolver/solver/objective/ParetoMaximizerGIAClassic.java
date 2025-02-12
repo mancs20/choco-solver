@@ -1,11 +1,12 @@
 package org.chocosolver.solver.objective;
 
-import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.events.IntEventType;
 import org.chocosolver.util.ESat;
+
+import java.util.Arrays;
 
 public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
@@ -25,18 +26,6 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
     @Override
     public void onSolution() {
-        // get objective values
-        boolean saveSolution = true;
-        if (portfolio) {
-            saveSolution = saveSolutionPortfolio();
-        }
-        if (saveSolution) {
-            for (int i = 0; i < n; i++) {
-                lastObjectiveVal[i] = objectives[i].getValue();
-            }
-            setLastSolution(new Solution(model));
-            lastSolution.record();
-        }
         if (!improveSolution){
             improveSolution = true;
             if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
@@ -44,17 +33,6 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
                 setLowestUpperBound();
             }
         }
-    }
-
-    private boolean saveSolutionPortfolio() {
-        boolean saveSolution = true;
-        for (int i = 0; i < n; i++) {
-            if (objectives[i].getValue() < lastObjectiveVal[i]) {
-                saveSolution = false;
-                break;
-            }
-        }
-        return saveSolution;
     }
 
     @Override
@@ -66,8 +44,8 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
     public void propagate(int evtmask) throws ContradictionException {
         if (!improveSolution){
             applyGavanelliFiltering();
-        }else{
-            computeDominatedArea();
+        } else{
+            //computeDominatedArea();
             if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
                     boundedType == GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES)){
                 verifyLowestUpperBound();
@@ -178,6 +156,11 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
         improveSolution = false;
         paretoFront.add(getLastObjectiveVal().clone());
 //        paretoTree.insert(getLastObjectiveVal().clone());
+    }
+
+    public void prepareGIAMaximizerForNextSolution(int[] newParetoPointToAdd){
+        improveSolution = false;
+        paretoFront.add(Arrays.copyOf(newParetoPointToAdd, newParetoPointToAdd.length));
     }
 
 
