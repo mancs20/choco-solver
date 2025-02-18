@@ -50,6 +50,20 @@ public class BuilderModel {
         if (config.getBenchmark().contains("taillard") && config.getInstancePath().endsWith(".fzn")) {
             return new TaillardDznFileReader(config);
         }
+        if (config.getBenchmark().contains("powa")) {
+            ProblemName problemName;
+            try {
+                problemName = ProblemName.valueOf(config.getProblem().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid problem name: " + config.getProblem());
+            }
+            switch (problemName) {
+                case NQUEENS:
+                    return new NQueenReader(config);
+                default:
+                    throw new IllegalArgumentException("Invalid problem name: " + problemName);
+            }
+        }
         throw new IllegalArgumentException("Invalid benchmark: " + config.getBenchmark());
     }
 
@@ -59,5 +73,5 @@ public class BuilderModel {
 }
 
 enum ProblemName {
-    UKP, SIMS
+    UKP, SIMS, NQUEENS
 }

@@ -1,8 +1,6 @@
-package org.chocosolver.examples.integer.experiments;
+package org.chocosolver.examples.integer.experiments.benchmarkreader;
 
-import org.chocosolver.examples.integer.experiments.benchmarkreader.BenchamarkReader;
-import org.chocosolver.examples.integer.experiments.benchmarkreader.ModelObjectivesVariables;
-import org.chocosolver.examples.integer.experiments.benchmarkreader.ProblemUKP;
+import org.chocosolver.examples.integer.experiments.Config;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
