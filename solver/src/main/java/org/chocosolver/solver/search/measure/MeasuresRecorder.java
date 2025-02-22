@@ -168,6 +168,10 @@ public final class MeasuresRecorder extends Measures {
         restartCount++;
     }
 
+    public void setRestartCount(long restartCount) {
+        this.restartCount = restartCount;
+    }
+
     /**
      * increment solution counter
      */

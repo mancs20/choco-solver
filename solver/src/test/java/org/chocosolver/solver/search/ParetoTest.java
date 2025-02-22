@@ -267,6 +267,114 @@ public class ParetoTest {
         }
     }
 
+    @Test(groups = "10s")
+    public void testParetoDifferentRegionsConstraintWithoutHardReset(){
+        Object[] modelAndObjectives = createConflinctingModelKnapSackExample();
+        Model model = (Model) modelAndObjectives[0];
+        IntVar[] objectives = (IntVar[]) modelAndObjectives[1];
+
+        // define the regions to search
+        int[][] boundsObj1 = new int[][]{
+                {15901,18278},
+                {18278,23349},
+                {0,15901}};
+        int[][] boundsObj2 = new int[][]{
+                {14103,17621},
+                {0,14103},
+                {17621,21741}};
+
+        // variable for the optimization version
+        int obj1UB = objectives[0].getUB();
+        int obj2UB = objectives[1].getUB();
+
+        ParetoMaximizerGIACoverage paretoPoint = new ParetoMaximizerGIACoverage(objectives, false, PropagatorPriority.BINARY);
+        Constraint c = new Constraint("PARETOOPTALLOBJ", paretoPoint);
+        c.post();
+
+        int idBounds = 0;
+
+        //search strategy
+        IntVar[] tempModelVars = model.retrieveIntVars(true);
+        IntVar[] notObjectivesVars = new IntVar[tempModelVars.length - objectives.length];
+        int index = 0;
+        for (int i = 0; i < tempModelVars.length; i++) {
+            if (tempModelVars[i] != objectives[0] && tempModelVars[i] != objectives[1]) {
+                notObjectivesVars[index] = tempModelVars[i];
+                index++;
+            }
+        }
+
+        int[] initialBounds = new int[objectives.length * 2];
+        // IMPORTANT add tge region strategy as the first strategy in the search
+//        RegionStrategy regionStrategy = new RegionStrategy(objectives, initialBounds);
+//        model.getSolver().setSearch(regionStrategy,
+//                Search.domOverWDegRefSearch(notObjectivesVars), Search.domOverWDegRefSearch(objectives));
+//        // if restart is used
+//        model.getSolver().plugMonitor(regionStrategy);
+
+        long solutionCounter = 0;
+        while (idBounds < 3){
+            // select the region
+            int[] boundObj1Current = boundsObj1[idBounds];
+            int[] boundObj2Current = boundsObj2[idBounds];
+            int[] lowerBounds = new int[]{boundObj1Current[0] + 1, boundObj2Current[0] +1};
+            int[] upperBounds = new int[]{boundObj1Current[1], boundObj2Current[1]};
+            idBounds++;
+
+            int[] lowerCorner = {boundObj1Current[0] + 1, boundObj2Current[0] +1};
+
+            int[] bounds = new int[objectives.length * 2];
+            for (int i = 0; i < objectives.length; i++){
+                bounds[i] = lowerCorner[i];
+                bounds[i + objectives.length] = upperBounds[i];
+            }
+            int[] boundsLow = new int[objectives.length];
+            for (int i = 0; i < objectives.length; i++){
+                boundsLow[i] = lowerCorner[i];
+            }
+
+            // IMPORTANT add the new bounds in every loop like this to avoid adding the search again.
+//            AbstractStrategy usedSearch = model.getSolver().getSearch();
+//            if (usedSearch instanceof StrategiesSequencer) {
+//                AbstractStrategy firstSearch = ((StrategiesSequencer) usedSearch).getStrategies()[0];
+//                if (firstSearch instanceof RegionStrategy) {
+//                    ((RegionStrategy) firstSearch).setBounds(bounds);
+//                }
+//            }
+
+            ParetoFeasibleRegion feasibleRegion = new ParetoFeasibleRegion(lowerBounds, upperBounds);
+//            ParetoFeasibleRegion feasibleRegion = new ParetoFeasibleRegion(new int[]{0,0}, new int[]{obj1UB, obj2UB});
+            paretoPoint.configureInitialUbLb(feasibleRegion);
+
+            boolean solutionFound = false;
+            paretoPoint.setLastSolution(null);
+            Solution solution = new Solution(model);
+
+            while (model.getSolver().solve()) {
+                paretoPoint.onSolution();
+                solution.record();
+                solutionFound = true;
+            }
+
+            // Get statistics
+            System.out.println(model.getSolver().getMeasures().toString());
+            if (solutionFound){
+                System.out.println("Solution found in region: " + Arrays.toString(boundObj1Current) + " " +
+                        Arrays.toString(boundObj2Current));
+                System.out.println("Objectives values: " + solution.getIntVal(objectives[0]) + " - " +
+                        solution.getIntVal(objectives[1]));
+            }else{
+                System.out.println("No solution found in region: " + Arrays.toString(boundObj1Current) + " " + Arrays.toString(boundObj2Current));
+                Assert.assertEquals(lowerCorner, new int[]{18279, 1}); // Here is in the only region that we should not find a solution
+            }
+
+            model.getSolver().reset();
+            // simulate a restart
+            solutionCounter++;
+            model.getSolver().getMeasures().setRestartCount(solutionCounter);
+        }
+    }
+
     private Object[] createConflinctingModelKnapSackExample() {
         int[] nbItems; // number of items for each type
         nbItems = new int[50];
