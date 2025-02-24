@@ -39,7 +39,8 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
         }
         if (!improveSolution){
             improveSolution = true;
-            if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
+//            if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
+            if (paretoFront.getRoot() != null && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
                     boundedType == GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES)){
                 setLowestUpperBound();
             }
@@ -68,7 +69,7 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
             applyGavanelliFiltering();
         }else{
             computeDominatedArea();
-            if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
+            if (paretoFront.getRoot() != null && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
                     boundedType == GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES)){
                 verifyLowestUpperBound();
             }
@@ -84,7 +85,7 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
     }
 
     private void applyGavanelliFiltering() throws ContradictionException{
-        if (paretoFront.isEmpty()) {
+        if (paretoFront.getRoot() == null) {
             return;
         }
         for (int i = 0; i < objectives.length; i++) {
@@ -116,14 +117,30 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
 
         // TODO check the point quad tree representation in the paper to avoid iterating over all the solutions
-        for (int[] sol : paretoFront) {
-            if (dominates(sol, dominatedPoint)) {
-                int currentPoint = sol[i] + 1;
-                if (tightestPoint < currentPoint) {
-                    tightestPoint = currentPoint;
-                }
+//        for (int[] sol : paretoFront) {
+//            if (dominates(sol, dominatedPoint)) {
+//                int currentPoint = sol[i] + 1;
+//                if (tightestPoint < currentPoint) {
+//                    tightestPoint = currentPoint;
+//                }
+//            }
+//        }
+
+
+        ParetoNode dominatingNode = paretoFront.getRoot();
+        do {
+            dominatingNode = paretoFront.isDominatedByFront(dominatingNode, dominatedPoint);
+            if (dominatingNode == null) {
+                break;
             }
-        }
+            int currentPoint = dominatingNode.point[i] + 1;
+            if (tightestPoint < currentPoint) {
+                tightestPoint = currentPoint;
+            }
+        }   while (dominatingNode != null);
+
+
+
         if (tightestPoint > Integer.MIN_VALUE) {
             objectives[i].updateLowerBound(tightestPoint, this);
         }
