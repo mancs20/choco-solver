@@ -95,11 +95,11 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
             }else{
                 fails();
             }
-        } else{
+        } //else{
             // all lower bounds are equal or greater than the last solution with at least one lower bound greater than
-            // the last solution
-            this.setPassive();
-        }
+            // the last solution. setPassive is not working
+//            this.setPassive();
+//        }
     }
 
     protected void computeDominatedAreaSimple() throws ContradictionException {

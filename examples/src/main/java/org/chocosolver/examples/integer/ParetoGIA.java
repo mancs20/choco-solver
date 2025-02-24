@@ -104,8 +104,11 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         c.post();
         paretoPoint.prepareGIAMaximizerFirstSolution();
         boolean keepExploring = true;
+        long solutionCount = 0;
         while (!stopCondition && keepExploring){
             keepExploring = getFrontPoint();
+            solutionCount++;
+            solver.getMeasures().setRestartCount(solutionCount);
         }
         return new Object[]{paretoSolutions, recorderList};
     }
@@ -327,14 +330,6 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
     }
 
     public static PropagatorPriority choosePropagatorPriority(int numObjectives){
-        PropagatorPriority priority;
-        if (numObjectives == 2){
-            priority = PropagatorPriority.BINARY;
-        } else if (numObjectives == 3){
-            priority = PropagatorPriority.TERNARY;
-        } else{
-            priority = PropagatorPriority.LINEAR;
-        }
-        return priority;
+        return PropagatorPriority.LINEAR;
     }
 }
