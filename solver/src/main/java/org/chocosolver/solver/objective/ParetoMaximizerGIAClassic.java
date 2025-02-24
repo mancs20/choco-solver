@@ -7,16 +7,31 @@ import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.events.IntEventType;
 import org.chocosolver.util.ESat;
 
+import java.util.Arrays;
+
 public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
 //    private final List<int[]> paretoFront;
     private boolean improveSolution;
+
+    private int[] minimumIncreaseLBToDominate;
+    private int lastWorld = -1;
+    private long lastNbOfBacktracks = -1;
+    private long lastNbOfRestarts = -1;
+    private boolean mustRecomputeCriticalInfos;
+    private int idOnlyObjectiveToCheckUBReduction;
+    private boolean checkUpperBoundReduction;
+    private boolean[] tryToReduceUB;
+
 //    private KDTree paretoTree;
 
     public ParetoMaximizerGIAClassic(final IntVar[] objectives, boolean portfolio, PropagatorPriority priority) {
         super(objectives, priority, false, portfolio);
 //        this.paretoFront = new ArrayList<>();
 //        this.paretoTree = new KDTree(n);
+        minimumIncreaseLBToDominate = originalUpperBounds.clone();
+        mustRecomputeCriticalInfos = true;
+        tryToReduceUB = new boolean[n];
     }
 
     //***********************************************************************************
@@ -92,9 +107,33 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
         }
 
         if(boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES){
+//            for (int i = 0; i < objectives.length; i++) {
+//                 computeLowestUpperBound(i);
+//            }
+
+            idOnlyObjectiveToCheckUBReduction = -1;
+            checkUpperBoundReduction = true;
             // filter using also the upper bound
-            for (int i = 0; i < objectives.length; i++) {
-                computeLowestUpperBound(i);
+            if (!this.mustRecomputeCriticalInfos()){
+                for (int i = 0; i < objectives.length; i++) {
+                    if (objectives[i].getLB() < minimumIncreaseLBToDominate[i]) {
+                        if (idOnlyObjectiveToCheckUBReduction == -1) {
+                            idOnlyObjectiveToCheckUBReduction = i;
+                        } else {
+                            checkUpperBoundReduction = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (checkUpperBoundReduction){
+                if (idOnlyObjectiveToCheckUBReduction != -1) {
+                    computeLowestUpperBound(idOnlyObjectiveToCheckUBReduction);
+                } else {
+                    for (int i = 0; i < objectives.length; i++) {
+                        computeLowestUpperBound(i);
+                    }
+                }
             }
         }
     }
@@ -148,10 +187,36 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
     private void computeLowestUpperBound(int i) throws ContradictionException {
         int[] dominatingPoint = computeDominatingPoint(i);
         // TODO check the point quad tree representation in the paper to avoid iterating over all the solutions
-        int lowestUpperBound = computeLowestUBToAvoidDomination(dominatingPoint, i);
+        int lowestUpperBound = computeLowestUBToAvoidDomination(dominatingPoint, i, minimumIncreaseLBToDominate);
         if (lowestUpperBound < Integer.MAX_VALUE) {
             objectives[i].updateUpperBound(lowestUpperBound, this);
         }
+    }
+
+    /**
+     * we recompute the Dantzig solution if :
+     * - a backtrack occured
+     * - capacity UB changed
+     * - an item has been determined
+     */
+    private boolean mustRecomputeCriticalInfos() {
+        checkWorld();
+        return mustRecomputeCriticalInfos;
+    }
+
+    private void checkWorld() {
+        int currentworld = model.getEnvironment().getWorldIndex();
+        long currentbt = model.getSolver().getBackTrackCount();
+        long currentrestart = model.getSolver().getRestartCount();
+//        if (currentworld < lastWorld || currentbt != lastNbOfBacktracks || currentrestart > lastNbOfRestarts) {
+        if (currentworld < lastWorld || currentbt != lastNbOfBacktracks) {
+            // case 1.  from mustRecomputeCriticalInfos()
+            mustRecomputeCriticalInfos = true;
+        } else
+            mustRecomputeCriticalInfos = false;
+        lastWorld = currentworld;
+        lastNbOfBacktracks = currentbt;
+        lastNbOfRestarts = currentrestart;
     }
 
     /**
@@ -176,7 +241,12 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
     public void prepareGIAMaximizerForNextSolution(){
         improveSolution = false;
-        paretoFront.add(getLastObjectiveVal().clone());
+        int[] paretoOptimal = getLastObjectiveVal().clone();
+        // update the minimum increase to dominate
+        for (int i = 0; i < n; i++) {
+            minimumIncreaseLBToDominate[i] = Math.min(minimumIncreaseLBToDominate[i], paretoOptimal[i]);
+        }
+        paretoFront.add(paretoOptimal);
 //        paretoTree.insert(getLastObjectiveVal().clone());
     }
 

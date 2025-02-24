@@ -146,6 +146,19 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
         return highestPossibleUpperBound;
     }
 
+    protected int computeLowestUBToAvoidDomination(int[] dominatingPoint, int i, int[] minimumIncreaseLBToDominate) {
+        int highestPossibleUpperBound = Integer.MAX_VALUE;
+        for (int[] sol : paretoFront) {
+            if (dominatesWithInfo(dominatingPoint, sol, minimumIncreaseLBToDominate)) {
+                int currentPoint = sol[i] - 1;
+                if (highestPossibleUpperBound > currentPoint) {
+                    highestPossibleUpperBound = currentPoint;
+                }
+            }
+        }
+        return highestPossibleUpperBound;
+    }
+
     private int[] computeDominatingPointLastObjectiveVal(int i) {
         int[] dp = lastObjectiveVal.clone();
         dp[i] = originalUpperBounds[i];
@@ -166,6 +179,30 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
             if (a[j] < b[j]) return false;
         }
         return true;
+    }
+
+    /**
+     *
+     * @param a vector
+     * @param b vector
+     * @param minimumValueToDominate an int[] representing how much it has to increase a[i] to dominate b[i]
+     * @return an int[] representing how much it has to increase a[i] to dominate b[i]
+     */
+    protected boolean dominatesWithInfo(int[] a, int[] b, int[] minimumValueToDominate) {
+        boolean dominates = true;
+        for (int j = 0; j < objectives.length; j++) {
+            if (a[j] < b[j]) {
+                if (b[j] > objectives[j].getLB() && b[j] < objectives[j].getUB()) {
+                    if (minimumValueToDominate[j] < objectives[j].getLB()) {
+                        minimumValueToDominate[j] = b[j];
+                    } else {
+                        minimumValueToDominate[j] = Math.min(b[j], minimumValueToDominate[j]);
+                    }
+                }
+                dominates = false;
+            }
+        }
+        return dominates;
     }
 
     @Override
