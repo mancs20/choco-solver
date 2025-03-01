@@ -120,6 +120,11 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         boolean foundSolution = false;
         try {
             while(solver.solve()){
+                // todo delete is for testing
+                if (paretoSolutions.size() == 2){
+                    System.out.println(solver.getMeasures().toString());
+                }
+                // end todo
                 paretoPoint.onSolution();
                 foundSolution = true;
             }
