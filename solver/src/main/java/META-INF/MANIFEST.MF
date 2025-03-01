@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Main-Class: org.chocosolver.examples.integer.experiments.ParetoGeneratio
+ nExperiments
+
