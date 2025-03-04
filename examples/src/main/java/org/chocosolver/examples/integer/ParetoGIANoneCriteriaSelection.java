@@ -13,6 +13,6 @@ public class ParetoGIANoneCriteriaSelection extends ParetoGIA {
 
     @Override
     protected ParetoMaximizerGIAGeneral setGIAPropagator(IntVar[] objectives, boolean portfolio) {
-        return new ParetoMaximizerGIAClassic(objectives, portfolio, choosePropagatorPriority(objectives.length));
+        return new ParetoMaximizerGIAClassic(objectives, portfolio, PropagatorPriority.LINEAR);
     }
 }

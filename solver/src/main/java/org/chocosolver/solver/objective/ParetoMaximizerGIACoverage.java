@@ -147,7 +147,7 @@ public class ParetoMaximizerGIACoverage extends ParetoMaximizerGIAGeneral {
 
     }
 
-    public void prepareGIAMaximizerForNextSolution(){
+    public void prepareGIAMaximizerForNextSolution(int[] lastSolution){
         configureInitialUbLb();
         setLastSolution(null);
     }
