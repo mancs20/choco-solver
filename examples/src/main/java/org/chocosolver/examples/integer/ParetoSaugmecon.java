@@ -23,16 +23,17 @@ public class ParetoSaugmecon implements TimeoutHolder {
     private final List<Solution> solutions = new ArrayList<>();
     private final List<String> recorderList = new ArrayList<>();
     private boolean stopCriterionReached;
-    private boolean performLexicographicOptimization;
+    private final boolean performLexicographicOptimization;
     private boolean cannotUseSaugmeconObjective;
-    protected long startTimeNano;
+    protected int solveCallsCount;
 
     public ParetoSaugmecon(boolean performLexicographicOptimization) {
         this.performLexicographicOptimization = performLexicographicOptimization;
+        solveCallsCount = 0;
     }
 
     public Object[] run(Model model, IntVar[] objectives, boolean maximize, int timeout) {
-        startTimeNano = System.nanoTime();
+        TimeStorage.lastUpdateTimeNano = System.nanoTime();
         this.timeout = timeout;
         this.model = model;
         solver = this.model.getSolver();
@@ -42,7 +43,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
         // Get the best value for each objective (maximization)
         getObjectivesOptimalValues();
         getNadirObjectiveValues();
-        List<Solution> allSolutions = null;
+        List<Solution> allSolutions;
         if (!stopCriterionReached){
             // Add the saugmecon objective
             setSaugmeconObjective();
@@ -57,7 +58,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
                 // if there is only 2 objectives, the rwv is empty
                 rwv = new int[]{};
             }else{
-                rwv = new int[bestObjectiveValues.length-2];
+                rwv = new int[bestObjectiveValues.length-1];
                 System.arraycopy(bestObjectiveValues, 1, rwv, 0, rwv.length);
             }
 
@@ -80,13 +81,13 @@ public class ParetoSaugmecon implements TimeoutHolder {
                 // check if the elements in recorderList that were found while optimizing individual objectives should
                 // be removed from the Pareto front approximation
                 int indexInsert = 0;
-                for (int i = 0; i < bestObjectiveValuesSolution.length; i++) {
+                for (Solution solution : bestObjectiveValuesSolution) {
                     // set k to -1 to check if a solution that doesn't belong to the front is dominated by the front
-                    if (!solutionKisDominatedByTheFront(bestObjectiveValuesSolution[i], solutions, -1)) {
+                    if (!solutionKisDominatedByTheFront(solution, solutions, -1)) {
                         // if the solution is not dominated by the front, add it to the front at index i
-                        solutions.add(indexInsert, bestObjectiveValuesSolution[i]);
+                        solutions.add(indexInsert, solution);
                         indexInsert++;
-                    }else{
+                    } else {
                         // if the solution is dominated by the front, remove it from the recorderList
                         recorderList.set(indexInsert, "No solution" + recorderList.get(indexInsert));
                     }
@@ -124,18 +125,29 @@ public class ParetoSaugmecon implements TimeoutHolder {
                 while (efArray[idObjective] < bestObjectiveValues[idObjective] && !stopCriterionReached) {
                     efArray[idObjective] = efArray[idObjective] + 1;
                     solveSaugmeconMostInnerLoop(efArray, rwv, previousSolutionInformation, previousSolutions);
+                    solveCallsCount++;
+                    solver.getMeasures().setRestartCount(solveCallsCount);
                 }
                 return;
             } else {
                 efArray[idObjective] = efArray[idObjective] + 1;
                 saugmeconLoop(efArray, rwv, idObjective, previousSolutionInformation, previousSolutions);
                 efArray[idObjective - 1] = nadirObjectiveValues[idObjective - 1] - 1;
+                if (efArray[idObjective] < bestObjectiveValues[idObjective]) {
+                    efArray[idObjective] = rwv[idObjective - 1];
+                    rwv[idObjective - 1] = bestObjectiveValues[idObjective];
+                } else {
+                    return;
+                }
             }
         }
-        idObjective += 1;
     }
 
     private void solveSaugmeconMostInnerLoop(int[] efArray, int[] rwv, List<SolutionEfArrayInformation> previousSolutionInformation, Set<String> previousSolutions) {
+        // todo delete is for debugging
+        System.out.println("efArray: " + Arrays.toString(efArray) + " rwv: " + Arrays.toString(rwv));
+        // todo end delete
+
         boolean exitFromLoopWithAcceleration = false;
         int[] solutionObjectiveValues = new int[objectives.length];
         // check if there are previous solutions that satisfy the constraints
@@ -147,7 +159,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
                 // the previous solution is infeasible
                 exitFromLoopWithAcceleration = true;
             }
-        }else {
+        } else {
             // update right-hand side values (rhs) for the objective constraints
             updateObjectiveConstraints(efArray);
             Solution solution = optimizeIntVar(saugmeconObjective, true, true, true);
@@ -161,7 +173,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
                 // the problem is infeasible
                 exitFromLoopWithAcceleration = true;
                 // save solution information
-                saveSolutionInformation(efArray, solutionObjectiveValues,  previousSolutionInformation);
+                saveSolutionInformation(efArray, null,  previousSolutionInformation);
             } else {
                 for (int i = 0; i < objectives.length; i++) {
                     solutionObjectiveValues[i] = solution.getIntVal(objectives[i]);
@@ -169,25 +181,21 @@ public class ParetoSaugmecon implements TimeoutHolder {
                 String solutionString = Arrays.toString(solutionObjectiveValues);
                 if (!previousSolutions.contains(solutionString)) {
                     previousSolutions.add(solutionString);
-                    saveSolutionInformation(efArray, solutionObjectiveValues,  previousSolutionInformation);
                     // add solution to the front
                     solutions.add(solution);
                 }
+                saveSolutionInformation(efArray, solutionObjectiveValues,  previousSolutionInformation);
             }
         }
         if (exitFromLoopWithAcceleration) {
-            // todo exit from loop with acceleration method
             exitFromLoop(efArray);
         } else {
             efArray[0] = solutionObjectiveValues[1];
-            // todo update rwv
-            updateRwv(rwv, solutionObjectiveValues);
+            updateRwv(rwv, Arrays.copyOfRange(solutionObjectiveValues, 2, solutionObjectiveValues.length));
         }
     }
 
     public static SolutionEfArrayInformation searchPreviousSolutionsRelaxation(int[] efArrayActual, List<SolutionEfArrayInformation> previousSolutionInformation){
-        // todo get value of the previous solution here
-//        getCloserRelaxation(efArrayActual, previousSolutionInformation);
         SolutionEfArrayInformation previousSolution;
         int idPreviousCloserRelaxation = getLessConstrainedPreviousSolutions(efArrayActual, previousSolutionInformation);
         if (idPreviousCloserRelaxation != -1) {
@@ -280,7 +288,6 @@ public class ParetoSaugmecon implements TimeoutHolder {
     }
 
     private int[] findSolutionsConsideringOneObjective(boolean maximize, boolean searchForBestObjectivesValues) {
-        // todo modify the code to deal with more than one objective
         if (stopCriterionReached) {
             return new int[]{};
         }
@@ -301,7 +308,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
     }
 
     private Solution optimizeIntVar(IntVar objective, boolean maximize, boolean saveStats, boolean optimizeSaugmeconObjective) {
-        timeout = updateSolverTimeoutCurrentTime(solver, timeout, startTimeNano);
+        timeout = updateSolverTimeoutCurrentTime(solver, timeout);
         Solution solution = null;
         if (timeout <= 0) {
             stopCriterionReached = true;
@@ -322,11 +329,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
                     recorderList.add(solver.getMeasures().toString());
                 }
                 if (!solver.isStopCriterionMet()){
-                    if (solution != null){
-                        solver.hardReset();
-                    }else{
-                        solver.reset();
-                    }
+                    solver.reset();
                 }else {
                     stopCriterionReached = true;
                 }
@@ -336,7 +339,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
     }
 
     private void setSaugmeconObjective() {
-        // check if the saugmecon objective can be calculated as in the paper. If the objectives are to big,
+        // check if the saugmecon objective can be calculated as in the paper. If the objectives are too big,
         // the coefficients in the objective function will exceed the int limit. In this case, there are two options:
         // 1. optimize objective 1 and at the end check if there are some solutions that do not belong to the pareto
         // front. This could happen if for the same optimal value of objective 1, there are more than value for
@@ -434,7 +437,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
 
     private void updateRwv(int[] rwv, int[] newSolutionValues){
         for (int i = 0; i < rwv.length; i++) {
-            if (newSolutionValues[i+2] < rwv[i]) {
+            if (newSolutionValues[i] < rwv[i]) {
                 rwv[i] = newSolutionValues[i];
             }
         }

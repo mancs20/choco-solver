@@ -53,7 +53,6 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
     protected float timeout;
     protected int[] lastObjectiveValues;
     protected boolean stopCondition;
-    protected long startTimeNano;
 
     public ParetoGIA(GiaConfig config, int timeout) {
         this.config = config;
@@ -64,7 +63,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
 
     public Object[] run(boolean maximize, Model model, IntVar[] objectives) {
         // Optimise independently two variables using the Pareto optimizer
-        startTimeNano = System.nanoTime();
+        TimeStorage.lastUpdateTimeNano = System.nanoTime();
         preparation(maximize, model, objectives);
         Object[] solutionsAndStats = new Object[0];
         try {
@@ -116,7 +115,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
     protected abstract ParetoMaximizerGIAGeneral setGIAPropagator(IntVar[] objectives, boolean portfolio);
 
     protected boolean getFrontPoint(){
-        timeout = updateSolverTimeoutCurrentTime(solver, timeout, startTimeNano);
+        timeout = updateSolverTimeoutCurrentTime(solver, timeout);
         boolean foundSolution = false;
         try {
             while(solver.solve()){

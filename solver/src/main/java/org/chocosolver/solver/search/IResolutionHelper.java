@@ -671,6 +671,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
         // find the minimum values for each objective k
         int[] b = new int[objectives.length];
         int idObjective = 0;
+        int solveCallsCount = 0;
         while (!timeoutReached && idObjective < objectives.length){
             timeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
             if (timeout <= 0){
@@ -684,6 +685,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 timeoutReached = true;
             }else{
                 ref().reset();
+                solveCallsCount++;
+                ref().getMeasures().setRestartCount(solveCallsCount);
             }
             if (solution != null){
                 // TODO add temp solution to the ParetoFront and remove it later if it is not a Pareto optimal solution
@@ -761,11 +764,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 if (ref().isStopCriterionMet()){
                     timeoutReached = true;
                 }else{
-                    if (solution != null){
-                        ref().hardReset();
-                    }else{
-                        ref().reset();
-                    }
+                    ref().reset();
                 }
 
                 // unpost constraints
@@ -774,6 +773,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
                         ref().getModel().unpost(constraintObjective);
                     }
                 }
+                solveCallsCount++;
+                ref().getMeasures().setRestartCount(solveCallsCount);
             }
         }
 
