@@ -144,10 +144,6 @@ public class ParetoSaugmecon implements TimeoutHolder {
     }
 
     private void solveSaugmeconMostInnerLoop(int[] efArray, int[] rwv, List<SolutionEfArrayInformation> previousSolutionInformation, Set<String> previousSolutions) {
-        // todo delete is for debugging
-        System.out.println("efArray: " + Arrays.toString(efArray) + " rwv: " + Arrays.toString(rwv));
-        // todo end delete
-
         boolean exitFromLoopWithAcceleration = false;
         int[] solutionObjectiveValues = new int[objectives.length];
         // check if there are previous solutions that satisfy the constraints
