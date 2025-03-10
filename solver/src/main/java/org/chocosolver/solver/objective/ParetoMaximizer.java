@@ -153,7 +153,11 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
             for (int[] sol : paretoFront) {
                 int dominates = dominates(sol, dominatedPoint, i);
                 if (dominates > 0) {
-                    int currentPoint = dominates == 1 ? sol[i] : sol[i] + 1;
+//                    int currentPoint = dominates == 1 ? sol[i] : sol[i] + 1; // if there are multiple equal solutions
+//                    and one of them is already in the Pareto front, it is possible that another one is found and
+//                    replace the existing one in the front. This is counterproductive, as the code is designed to store
+//                    just one solution for each Pareto point.
+                    int currentPoint = sol[i] + 1;
                     if (tightestPoint < currentPoint) {
                         tightestPoint = currentPoint;
                     }

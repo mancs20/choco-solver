@@ -280,7 +280,13 @@ public class ParetoSaugmecon implements TimeoutHolder {
     }
 
     private void getNadirObjectiveValues() {
-        nadirObjectiveValues = findSolutionsConsideringOneObjective(false, false);
+        // to obtain the nadir values it is faster to use the lower bound of the objectives instead of computing the
+        // inverse optimal values
+        nadirObjectiveValues = new int[objectives.length - 1];
+        for (int i = 1; i < objectives.length; i++) {
+            nadirObjectiveValues[i - 1] = objectives[i].getLB();
+        }
+//        nadirObjectiveValues = findSolutionsConsideringOneObjective(false, false);
     }
 
     private int[] findSolutionsConsideringOneObjective(boolean maximize, boolean searchForBestObjectivesValues) {
