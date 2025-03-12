@@ -564,13 +564,14 @@ public interface IResolutionHelper extends ISelf<Solver> {
         Constraint c = new Constraint("PARETOOPTALLOBJ", paretoPoint);
         c.post();
         boolean timeoutReached = false;
+        float remainingTime = 0;
         while (possibleFeasibleHyperrectangles.size() > 0 && !timeoutReached){
             ParetoFeasibleRegion feasibleRegion;
             feasibleRegion = getNextPossibleRegion(possibleFeasibleHyperrectangles);
             paretoPoint.configureInitialUbLb(feasibleRegion);
             paretoPoint.setLastSolution(null);
-            timeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
-            if (timeout <= 0){
+            remainingTime = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
+            if (remainingTime == 0){
                 timeoutReached = true;
                 break;
             }
@@ -655,6 +656,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
     default Object[] findParetoFrontByDisjunctiveProgramming(IntVar[] objectives, boolean maximize, float timeout,
                                                              Criterion... stop) throws Exception {
         long startTimeNano = System.nanoTime();
+        float remainingTime = 0;
         // convert to minimization
         objectives = Stream.of(objectives).map(o -> maximize ? ref().getModel().neg(o) : o).toArray(IntVar[]::new);
 
@@ -673,8 +675,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
         int idObjective = 0;
         int solveCallsCount = 0;
         while (!timeoutReached && idObjective < objectives.length){
-            timeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
-            if (timeout <= 0){
+            remainingTime = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
+            if (remainingTime == 0){
                 timeoutReached = true;
                 break;
             }
@@ -724,8 +726,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 constraintObjectives[i] = ref().getModel().arithm(objectives[i], "<", currentDisjunction[i]);
                 constraintObjectives[i].post();
             }
-            timeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
-            if (timeout <= 0){
+            remainingTime = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
+            if (remainingTime == 0){
                 timeoutReached = true;
                 break;
             }
@@ -895,6 +897,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
         IntVar objectiveSum = ref().getModel().intVar("objectiveSum", objectives[0].getLB() + objectives[1].getLB(),
                 objectives[0].getUB() + objectives[1].getUB());
         ref().getModel().sum(objectives, "=", objectiveSum).post();
+        float remainingTimeout = 0;
         while (possibleFeasibleHyperrectangles.size() > 0 && !timeoutReached){
             ParetoFeasibleRegion feasibleRegion;
             feasibleRegion = getNextPossibleRegion(possibleFeasibleHyperrectangles);
@@ -906,8 +909,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 constraintObjectives[j+1] = ref().getModel().arithm(objectives[i], "<=", feasibleRegion.getUpperCorner()[i]);
                 constraintObjectives[j+1].post();
             }
-            timeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
-            if (timeout <= 0){
+            remainingTimeout = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
+            if (remainingTimeout == 0){
                 timeoutReached = true;
                 break;
             }
@@ -929,14 +932,11 @@ public interface IResolutionHelper extends ISelf<Solver> {
             if (ref().isStopCriterionMet()){
                 timeoutReached = true;
             }else{
-                float elapsedTime = ref().getTimeCount();
-                timeout = timeout - elapsedTime;
                 if (solution != null){
                     ref().hardReset();
                 }else{
                     ref().reset();
                 }
-                ref().limitTime(timeout + "s");
             }
 
             // unpost constraints
@@ -951,12 +951,17 @@ public interface IResolutionHelper extends ISelf<Solver> {
         return new Object[]{paretoSolutions, recorderList};
     }
 
-    default float updateSolverTimeoutCurrentTime(Solver solver, float timeout, long startTimeNano){
-        long currentTimeNano = System.nanoTime();
-        float elapsedTime = (float) (currentTimeNano - startTimeNano) / 1_000_000_000;
-        timeout = timeout - elapsedTime;
-        solver.limitTime(timeout + "s");
-        return timeout;
+    default float updateSolverTimeoutCurrentTime(Solver solver, float totalTimeout, long startTimeNano){
+        long currentTime = System.nanoTime();
+        float elapsedTime = (currentTime - startTimeNano) / 1_000_000_000f;
+        float newTimeout = totalTimeout - elapsedTime;
+
+        if (newTimeout > 0) {
+            solver.limitTime(newTimeout + "s");
+        } else {
+            newTimeout = 0;
+        }
+        return newTimeout;
     }
 
     /**

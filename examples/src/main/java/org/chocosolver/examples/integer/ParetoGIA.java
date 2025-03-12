@@ -53,6 +53,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
     protected float timeout;
     protected int[] lastObjectiveValues;
     protected boolean stopCondition;
+    private long startTime;
 
     public ParetoGIA(GiaConfig config, int timeout) {
         this.config = config;
@@ -63,7 +64,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
 
     public Object[] run(boolean maximize, Model model, IntVar[] objectives) {
         // Optimise independently two variables using the Pareto optimizer
-        TimeStorage.lastUpdateTimeNano = System.nanoTime();
+        startTime = System.nanoTime();
         preparation(maximize, model, objectives);
         Object[] solutionsAndStats = new Object[0];
         try {
@@ -73,8 +74,9 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         }
         List<Solution> solutions = (List<Solution>) solutionsAndStats[0];
         List<String> stats = (List<String>) solutionsAndStats[1];
+        boolean exhaustive = (boolean) solutionsAndStats[2];
 
-        return new Object[]{solutions, stats};
+        return new Object[]{solutions, stats, exhaustive};
     }
 
     private void preparation(boolean maximize, Model model, IntVar[] objectives){
@@ -104,19 +106,27 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         paretoPoint.prepareGIAMaximizerFirstSolution();
         boolean keepExploring = true;
         long solutionCount = 0;
+        boolean exhaustive = false;
         while (!stopCondition && keepExploring){
             keepExploring = getFrontPoint();
             solutionCount++;
             solver.getMeasures().setRestartCount(solutionCount);
         }
-        return new Object[]{paretoSolutions, recorderList};
+        if (!keepExploring ) {
+            exhaustive = true;
+        }
+        return new Object[]{paretoSolutions, recorderList, exhaustive};
     }
 
     protected abstract ParetoMaximizerGIAGeneral setGIAPropagator(IntVar[] objectives, boolean portfolio);
 
     protected boolean getFrontPoint(){
-        timeout = updateSolverTimeoutCurrentTime(solver, timeout);
         boolean foundSolution = false;
+        float remainingTimeout = updateSolverTimeoutCurrentTime(solver, timeout, startTime);
+        if (remainingTimeout == 0) {
+            stopCondition = true;
+            return false;
+        }
         try {
             while(solver.solve()){
                 paretoPoint.onSolution();

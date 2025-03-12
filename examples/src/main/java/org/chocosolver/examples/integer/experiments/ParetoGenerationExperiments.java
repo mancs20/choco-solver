@@ -254,8 +254,16 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
         float totalTime = (float) results[2];
         // check if results[3] exists
         List<Solution> allSolutions = null;
-        if (results.length == 4) {
-            allSolutions = (List<Solution>) results[3];
+        if (results.length >= 4) {
+            // check the type of results[3] if it is a list of solutions or a boolean
+            if (results[3] instanceof List) {
+                allSolutions = (List<Solution>) results[3];
+                if (results.length == 5) {
+                    exhaustive = (Boolean) results[4];
+                }
+            } else if (results[3] instanceof Boolean) {
+                exhaustive = (Boolean) results[3];
+            }
         }
 
         String[] solverMessages = new String[stats.size()];

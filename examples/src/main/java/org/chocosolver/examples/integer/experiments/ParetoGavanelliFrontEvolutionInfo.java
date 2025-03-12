@@ -16,7 +16,8 @@ public class ParetoGavanelliFrontEvolutionInfo {
         List<Solution> solutions = (List<Solution>) solutionsAndStats[0];
         List<String> stats = (List<String>) solutionsAndStats[1];
         List<Solution> allSolutions = (List<Solution>) solutionsAndStats[2];
+        boolean exhaustive = (boolean) solutionsAndStats[3];
 
-        return new Object[]{solutions, stats, allSolutions};
+        return new Object[]{solutions, stats, allSolutions, exhaustive};
     }
 }
