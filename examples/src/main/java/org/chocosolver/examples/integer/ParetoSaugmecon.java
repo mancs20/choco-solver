@@ -151,12 +151,23 @@ public class ParetoSaugmecon implements TimeoutHolder {
         int[] solutionObjectiveValues = new int[objectives.length];
         // check if there are previous solutions that satisfy the constraints
         SolutionEfArrayInformation previousSolutionSatisfyCurrentConstraint = searchPreviousSolutionsRelaxation(efArray, previousSolutionInformation);
+        // uncomment for debugging
+//        System.out.print("efArray: " + Arrays.toString(efArray) + "rwv: " + Arrays.toString(rwv));
+
         if (previousSolutionSatisfyCurrentConstraint != null) {
+            // uncomment for debugging
+//            System.out.print(" is satisfied by a previous solution: ");
+
             if (previousSolutionSatisfyCurrentConstraint.isFeasible()) {
                 solutionObjectiveValues = previousSolutionSatisfyCurrentConstraint.getSolution();
+                // uncomment for debugging
+//                System.out.println(Arrays.toString(solutionObjectiveValues) + " efArrayPrevious: " +
+//                        Arrays.toString(previousSolutionSatisfyCurrentConstraint.getEfArray()));
             } else{
                 // the previous solution is infeasible
                 exitFromLoopWithAcceleration = true;
+                // uncomment for debugging
+//                System.out.println(" infeasible");
             }
         } else {
             // update right-hand side values (rhs) for the objective constraints
@@ -173,16 +184,26 @@ public class ParetoSaugmecon implements TimeoutHolder {
                 exitFromLoopWithAcceleration = true;
                 // save solution information
                 saveSolutionInformation(efArray, null,  previousSolutionInformation);
+
+                // uncomment for debugging
+//                System.out.println(" after solved is infeasible");
+
             } else {
                 for (int i = 0; i < objectives.length; i++) {
                     solutionObjectiveValues[i] = solution.getIntVal(objectives[i]);
                 }
+
+                // uncomment for debugging
+//                System.out.println(" after solved is feasible: " + Arrays.toString(solutionObjectiveValues));
+
                 String solutionString = Arrays.toString(solutionObjectiveValues);
                 if (!previousSolutions.contains(solutionString)) {
                     previousSolutions.add(solutionString);
                     // add solution to the front
                     solutions.add(solution);
-                }
+                } //else { // uncomment for debugging
+//                    System.out.println("Above solution already in the front");
+//                }
                 saveSolutionInformation(efArray, solutionObjectiveValues,  previousSolutionInformation);
             }
         }
@@ -209,7 +230,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
         if (previousSolutionInformation.isEmpty()) {
             return -1;
         }
-        int idx = bisectLeftPreviousSolutionsSortedDescending(efArrayActual, previousSolutionInformation) - 1;
+        int idx = previousSolutionInformation.size() - 1;
         boolean solutionWithMoreRelaxationFound = false;
         while (!solutionWithMoreRelaxationFound && idx > -1) {
             if (efArray1LessConstraintEfArray2(previousSolutionInformation.get(idx).getEfArray(), efArrayActual)) {
@@ -230,11 +251,9 @@ public class ParetoSaugmecon implements TimeoutHolder {
     }
 
     private static void saveSolutionInformation(int[] efArrayActual, int[] solutionObjectiveValues, List<SolutionEfArrayInformation> previousSolutionInformation) {
-        int lo = idInsortLeftPreviousSolutions(efArrayActual, previousSolutionInformation);
-        // translate this python code to java previous_solution_information.insert(lo, [ef_array_to_insert, solution])
         boolean feasible = solutionObjectiveValues != null;
         SolutionEfArrayInformation solutionEfArrayInformation = new SolutionEfArrayInformation(solutionObjectiveValues, efArrayActual.clone(), feasible);
-        previousSolutionInformation.add(lo, solutionEfArrayInformation);
+        previousSolutionInformation.add(solutionEfArrayInformation);
     }
 
     private static int idInsortLeftPreviousSolutions(int[] efArrayActual, List<SolutionEfArrayInformation> previousSolutionInformation) {
