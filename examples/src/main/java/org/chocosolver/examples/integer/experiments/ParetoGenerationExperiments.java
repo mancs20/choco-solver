@@ -398,6 +398,7 @@ class SolverStats {
     private static final Pattern PATTERN = Pattern.compile(
             "Solutions: ([\\d,]+)\\s+"
             + "(?:MAXIMIZE .+?|MINIMIZE .+?)?\\s+"
+            + "(?:.*?\\s+)?"
             + "Building time : ([\\d.]+)s\\s+"
             + "Resolution time : ([\\d.,]+)s\\s+"
             + "(?:Time to best solution : [\\d.,]+s\\s+)?"

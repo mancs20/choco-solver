@@ -10,6 +10,8 @@
 package org.chocosolver.solver.objective;
 
 import org.chocosolver.solver.ResolutionPolicy;
+import org.chocosolver.solver.exception.ContradictionException;
+import org.chocosolver.solver.exception.SolverException;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.RealVar;
 import org.chocosolver.solver.variables.Variable;
@@ -17,6 +19,7 @@ import org.chocosolver.solver.variables.Variable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.function.Function;
+import java.util.function.IntUnaryOperator;
 
 /**
  * Factory to create (mono-)objective managers.
@@ -37,6 +40,15 @@ public final class ObjectiveFactory {
      */
     public static IObjectiveManager<Variable> SAT() {
         return SATManager.getInstance();
+    }
+
+    /**
+     * Define a manager for GIA multiobjective optimization.
+     *
+     * @return a singleton object
+     */
+    public static IObjectiveManager<Variable> GIA(IntVar[] objectives) {
+        return GIAManager.getInstance(objectives);
     }
 
     /**
@@ -196,4 +208,146 @@ final class SATManager implements IObjectiveManager<Variable> {
         return "SAT";
     }
 
+}
+
+class GIAManager implements IObjectiveManager<Variable> {
+
+    private static final long serialVersionUID = 2115489336443115889L;
+    private static GIAManager INSTANCE = null; // Lazy initialization
+
+    /**
+     * The variable to optimize
+     **/
+    transient protected final IntVar[] objectives;
+
+    /**
+     * define the precision to consider a variable as instantiated
+     **/
+    protected final int precision = 1;
+
+    /**
+     * best lower bounds found so far
+     **/
+    protected int[] bestProvedLB;
+    protected int[] intialLB;
+
+    /**
+     * best upper bounds found so far
+     **/
+    protected int[] bestProvedUB;
+    protected int[] intialUB;
+
+    /**
+     * Define how the cut should be updated when posting the cut
+     **/
+    transient protected IntUnaryOperator cutComputer = n -> n; // walking cut by default
+
+    private GIAManager(IntVar[] objectives) {
+        this.objectives = objectives;
+        this.bestProvedLB = new int[objectives.length];  // Initialize best bounds
+        this.bestProvedUB = new int[objectives.length];
+        this.intialLB = new int[objectives.length];
+        this.intialUB = new int[objectives.length];
+        for (int i = 0; i < objectives.length; i++) {
+            bestProvedLB[i] = objectives[i].getLB();
+            intialLB[i] = objectives[i].getLB();
+            bestProvedUB[i] = objectives[i].getUB();
+            intialUB[i] = objectives[i].getUB();
+        }
+    }
+
+    /**
+     * Get the singleton instance. Throws an exception if not initialized.
+     */
+    public static GIAManager getInstance(IntVar[] objectives) {
+        if (INSTANCE == null) {
+            INSTANCE = new GIAManager(objectives);
+        } else {
+            System.arraycopy(INSTANCE.intialLB, 0, INSTANCE.bestProvedLB, 0, INSTANCE.objectives.length);
+            System.arraycopy(INSTANCE.intialUB, 0, INSTANCE.bestProvedUB, 0, INSTANCE.objectives.length);
+        }
+        return INSTANCE;
+    }
+
+    /**
+     * readResolve method to preserve singleton property during deserialization.
+     */
+    private Object readResolve() {
+        return INSTANCE;
+    }
+
+
+    @Override
+    public ResolutionPolicy getPolicy() {
+        return ResolutionPolicy.SATISFACTION;
+    }
+
+    @Override
+    public Number getBestLB() {
+        throw new UnsupportedOperationException("There is no objective bounds in satisfaction problems");
+    }
+
+    @Override
+    public Number getBestUB() {
+        throw new UnsupportedOperationException("There is no objective bounds in satisfaction problems");
+    }
+
+    @Override
+    public Number getBestSolutionValue() {
+        throw new UnsupportedOperationException("There is no objective variable in satisfaction problems");
+    }
+
+    @Override
+    public Variable getObjective() {
+        return null;
+    }
+
+    @Override
+    public boolean updateBestSolution(Number n) {
+        return false;
+    }
+
+    @Override
+    public boolean updateBestSolution() {
+        boolean improved = true;
+        for (int i = 0; i < objectives.length; i++) {
+            if (!objectives[i].isInstantiated()) {
+                throw new SolverException(
+                        "objective variable (" + objectives[i] + ") is not instantiated on solution. Check constraints and/or decision variables.");
+            }
+            if (bestProvedLB[i] > objectives[i].getValue()) {
+                improved = false;
+                break;
+            }
+        }
+        if (improved) {
+            for (int i = 0; i < objectives.length; i++) {
+                bestProvedLB[i] = objectives[i].getValue();
+            }
+        }
+        return improved;
+    }
+
+    @Override
+    public void setCutComputer(Function<Number, Number> cutComputer) {
+
+    }
+
+    @Override
+    public void setStrictDynamicCut() {
+        cutComputer = n -> n + precision;
+    }
+
+    @Override
+    public void setWalkingDynamicCut() {
+        cutComputer = n -> n;
+    }
+
+    @Override
+    public void postDynamicCut() throws ContradictionException {
+        for (int i = 0; i < objectives.length; i++) {
+            objectives[i].updateLowerBound(cutComputer.applyAsInt(bestProvedLB[i]), this);
+            objectives[i].updateUpperBound(bestProvedUB[i], this);
+        }
+    }
 }

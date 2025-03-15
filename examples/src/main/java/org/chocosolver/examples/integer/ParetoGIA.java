@@ -125,6 +125,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         boolean foundSolution = false;
         Solution solution = null;
         paretoOptimalPoint.setDeactivated();
+        model.setObjectives(objectives);
         int[] lastSolution = new int[objectives.length];
         try {
             while(solver.solve()){
@@ -139,7 +140,6 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
                 paretoNonDominatedPoint.onSolution();
 
                 foundSolution = true;
-//                lastSolution = new int[objectives.length];
                 for (int i = 0; i < objectives.length; i++){
                     lastSolution[i] = objectives[i].getValue();
                 }
@@ -176,13 +176,14 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         }
         if (foundSolution) {
             paretoSolutions.add(solution);
-            // reset to the initial state
-            if (solver.isStopCriterionMet() || (config.getCriteriaSelection() == GiaConfig.CriteriaSelection.NONE)) {
-                stopCondition = true;
-            } else {
-                solver.reset(); // if reset is does not work, use the search strategy regionSearch
-            }
             paretoNonDominatedPoint.prepareGIAMaximizerForNextSolution(lastSolution);
+        }
+        // reset to the initial state
+        if (solver.isStopCriterionMet() || (!foundSolution &&
+                (config.getCriteriaSelection() == GiaConfig.CriteriaSelection.NONE))) {
+            stopCondition = true;
+        } else {
+            solver.reset(); // if reset is does not work, use the search strategy regionSearch
         }
         return foundSolution;
     }

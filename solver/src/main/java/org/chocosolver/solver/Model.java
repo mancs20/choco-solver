@@ -760,6 +760,13 @@ public final class Model implements IModel {
         getSolver().setObjectiveManager(ObjectiveFactory.SAT());
     }
 
+    public void setObjectives(IntVar[] objectives) {
+        if (objectives == null) {
+            throw new SolverException("Cannot set objectives to null");
+        } else {
+            getSolver().setObjectiveManager(ObjectiveFactory.GIA(objectives));
+        }
+    }
     /**
      * In case of real variable to optimize, a precision is required.
      *
