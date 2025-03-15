@@ -82,17 +82,22 @@ public class ParetoSaugmecon implements TimeoutHolder {
                 System.out.println("Stop criterion reached, the Pareto front is incomplete");
                 // check if the elements in recorderList that were found while optimizing individual objectives should
                 // be removed from the Pareto front approximation
-                int indexInsert = 0;
-                for (Solution solution : bestObjectiveValuesSolution) {
+                for (int i = 0; i < bestObjectiveValuesSolution.length; i++) {
                     // set k to -1 to check if a solution that doesn't belong to the front is dominated by the front
-                    if (!solutionKisDominatedByTheFront(solution, solutions, -1)) {
+                    if (!solutionKisDominatedByTheFront(bestObjectiveValuesSolution[i], solutions, -1)) {
                         // if the solution is not dominated by the front, add it to the front at index i
-                        solutions.add(indexInsert, solution);
-                        indexInsert++;
+                        solutions.add(i, bestObjectiveValuesSolution[i]);
                     } else {
                         // if the solution is dominated by the front, remove it from the recorderList
-                        recorderList.set(indexInsert, "No solution" + recorderList.get(indexInsert));
+                        recorderList.set(i, "No solution" + recorderList.get(i));
                     }
+                }
+                // check if the last solution is dominated by the front
+                if (solutionKisDominatedByTheFront(solutions.get(solutions.size()-1), solutions, solutions.size()-1)) {
+                    // if the solution is not dominated by the front, add it to the front at the end
+                    solutions.remove(solutions.size()-1);
+                    // if the solution is dominated by the front, remove it from the recorderList
+                    recorderList.set(recorderList.size()-1, "No solution" + recorderList.get(recorderList.size()-1));
                 }
             }else{
                 // remove the elements in recorderList that were found while optimizing individual objectives
@@ -122,7 +127,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
             return false;
         }
         idObjective -= 1;
-        while (efArray[idObjective] < bestObjectiveValues[idObjective]) {
+        while (efArray[idObjective] < bestObjectiveValues[idObjective] && !stopCriterionReached) {
             if (idObjective == 0) {
                 while (efArray[idObjective] < bestObjectiveValues[idObjective] && !stopCriterionReached) {
                     efArray[idObjective] = efArray[idObjective] + 1;
@@ -130,20 +135,31 @@ public class ParetoSaugmecon implements TimeoutHolder {
                     solveCallsCount++;
                     solver.getMeasures().setRestartCount(solveCallsCount);
                 }
-                return true;
+                return false;
             } else {
                 efArray[idObjective] = efArray[idObjective] + 1;
+                if (idObjective > 1) {
+                    rwv[idObjective - 2] = bestObjectiveValues[idObjective - 1];
+                }
                 saugmeconLoop(efArray, rwv, idObjective, previousSolutionInformation, previousSolutions);
                 efArray[idObjective - 1] = nadirObjectiveValues[idObjective - 1] - 1;
                 if (efArray[idObjective] < bestObjectiveValues[idObjective]) {
                     efArray[idObjective] = rwv[idObjective - 1];
                     rwv[idObjective - 1] = bestObjectiveValues[idObjective];
                 } else {
-                    return true;
+                    if (idObjective == bestObjectiveValues.length - 1) {
+                        return true;
+                    } else {
+                        return false;
+                    }
                 }
             }
         }
-        return true;
+        if ((idObjective == bestObjectiveValues.length - 1) && efArray[idObjective] >= bestObjectiveValues[idObjective]) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private void solveSaugmeconMostInnerLoop(int[] efArray, int[] rwv, List<SolutionEfArrayInformation> previousSolutionInformation, Set<String> previousSolutions) {
