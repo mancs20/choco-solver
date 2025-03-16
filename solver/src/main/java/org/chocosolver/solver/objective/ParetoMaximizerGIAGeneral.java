@@ -121,6 +121,10 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
         }
     }
 
+    public int[] getHighestCurrentUpperBounds() {
+        return highestCurrentUpperBounds;
+    }
+
     protected void setLowestUpperBound(){
         highestCurrentUpperBounds = new int[n];
         for (int i = 0; i < n; i++) {
@@ -134,7 +138,7 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
     }
 
     protected int computeLowestUBToAvoidDomination(int[] dominatingPoint, int i) {
-        int highestPossibleUpperBound = Integer.MAX_VALUE;
+        int highestPossibleUpperBound = originalUpperBounds[i];
         for (int[] sol : paretoFront) {
             if (dominates(dominatingPoint, sol)) {
                 int currentPoint = sol[i] - 1;
@@ -178,7 +182,7 @@ public abstract class ParetoMaximizerGIAGeneral extends Propagator<IntVar> imple
 
     }
 
-    public abstract void prepareGIAMaximizerForNextSolution();
+    public abstract void prepareGIAMaximizerForNextSolution(int[] lastSolution);
 
     public abstract void prepareGIAMaximizerFirstSolution();
 

@@ -1,21 +1,17 @@
 package org.chocosolver.solver.objective;
 
-import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.variables.IntVar;
-import org.chocosolver.solver.variables.events.IntEventType;
 import org.chocosolver.util.ESat;
 
 public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
-//    private final List<int[]> paretoFront;
-    private boolean improveSolution;
 //    private KDTree paretoTree;
+    private boolean activated;
 
     public ParetoMaximizerGIAClassic(final IntVar[] objectives, boolean portfolio, PropagatorPriority priority) {
         super(objectives, priority, false, portfolio);
-//        this.paretoFront = new ArrayList<>();
 //        this.paretoTree = new KDTree(n);
     }
 
@@ -25,61 +21,21 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
     @Override
     public void onSolution() {
-        // get objective values
-        boolean saveSolution = true;
-        if (portfolio) {
-            saveSolution = saveSolutionPortfolio();
-        }
-        if (saveSolution) {
-            for (int i = 0; i < n; i++) {
-                lastObjectiveVal[i] = objectives[i].getValue();
-            }
-            setLastSolution(new Solution(model));
-            lastSolution.record();
-        }
-        if (!improveSolution){
-            improveSolution = true;
-            if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
-                    boundedType == GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES)){
-                setLowestUpperBound();
-            }
-        }
-    }
-
-    private boolean saveSolutionPortfolio() {
-        boolean saveSolution = true;
         for (int i = 0; i < n; i++) {
-            if (objectives[i].getValue() < lastObjectiveVal[i]) {
-                saveSolution = false;
-                break;
-            }
+            lastObjectiveVal[i] = objectives[i].getValue();
         }
-        return saveSolution;
+        activated = false;
     }
 
-    @Override
-    public int getPropagationConditions(int vIdx) {
-        return IntEventType.boundAndInst();
-    }
+//    @Override
+//    public int getPropagationConditions(int vIdx) {
+//        return IntEventType.boundAndInst();
+//    }
 
     @Override
     public void propagate(int evtmask) throws ContradictionException {
-        if (!improveSolution){
+        if (activated) {
             applyGavanelliFiltering();
-        }else{
-            computeDominatedArea();
-            if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
-                    boundedType == GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES)){
-                verifyLowestUpperBound();
-            }
-        }
-    }
-
-    private void verifyLowestUpperBound() throws ContradictionException {
-        for (int i = 0; i < objectives.length; i++) {
-            if (objectives[i].getUB() > highestCurrentUpperBounds[i]) {
-                objectives[i].updateUpperBound(highestCurrentUpperBounds[i], this);
-            }
         }
     }
 
@@ -171,12 +127,12 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
     }
 
     public void prepareGIAMaximizerFirstSolution() {
-        improveSolution = false;
+        activated = true;
     }
 
-    public void prepareGIAMaximizerForNextSolution(){
-        improveSolution = false;
-        paretoFront.add(getLastObjectiveVal().clone());
+    public void prepareGIAMaximizerForNextSolution(int[] lastParetoOptimal) {
+        activated = true;
+        paretoFront.add(lastParetoOptimal);
 //        paretoTree.insert(getLastObjectiveVal().clone());
     }
 
@@ -212,7 +168,7 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
     }
 
     public void setLastObjectiveVal(int[] lastObjectiveVal) {
-        this.lastObjectiveVal = lastObjectiveVal;
+//        this.lastObjectiveVal = lastObjectiveVal;
     }
 }
 
