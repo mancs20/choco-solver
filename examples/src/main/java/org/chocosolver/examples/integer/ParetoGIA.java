@@ -24,6 +24,7 @@ import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.objective.*;
 import org.chocosolver.solver.search.ParetoFeasibleRegion;
+import org.chocosolver.solver.search.SearchState;
 import org.chocosolver.solver.variables.IntVar;
 
 import java.util.ArrayList;
@@ -50,13 +51,15 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
     protected ParetoMaximizerGIAImproveSolution paretoOptimalPoint;
     protected float timeout;
     protected int[] lastObjectiveValues;
-    protected boolean stopCondition;
+    protected boolean stopCriterionMet;
+    protected boolean exhaustive;
     private long startTime;
 
     public ParetoGIA(GiaConfig config, int timeout) {
         this.config = config;
         this.timeout = timeout;
-        stopCondition = false;
+        stopCriterionMet = false;
+        exhaustive = false;
         numObjectivesAllowed = 0; // indefinite number of objectives
     }
 
@@ -109,43 +112,30 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         t.post();
 
         paretoNonDominatedPoint.prepareGIAMaximizerFirstSolution();
-        boolean keepExploring = true;
+        boolean foundSolution = true;
         long solutionCount = 0;
-        boolean exhaustive = false;
-        while (!stopCondition && keepExploring){
-            keepExploring = getFrontPoint(reduceUB);
+        while (!stopCriterionMet && !exhaustive){
+            foundSolution = getFrontPoint(reduceUB);
             solutionCount++;
             solver.getMeasures().setRestartCount(solutionCount);
-        }
-        if (!keepExploring ) {
-            exhaustive = true;
         }
         return new Object[]{paretoSolutions, recorderList, exhaustive};
     }
 
     protected abstract ParetoMaximizerGIAGeneral setGIAPropagator(IntVar[] objectives, boolean portfolio);
 
-//<<<<<<< HEAD
-//    protected boolean getFrontPoint(){
-//        boolean foundSolution = false;
-//        float remainingTimeout = updateSolverTimeoutCurrentTime(solver, timeout, startTime);
-//        if (remainingTimeout == 0) {
-//            stopCondition = true;
-//            return false;
-//        }
-//=======
     protected boolean getFrontPoint(boolean reduceUB){
         boolean foundSolution = false;
         float remainingTimeout = updateSolverTimeoutCurrentTime(solver, timeout, startTime);
         if (remainingTimeout == 0) {
-            stopCondition = true;
+            stopCriterionMet = true;
+            exhaustive = false;
             return false;
         }
         Solution solution = null;
         paretoOptimalPoint.setDeactivated();
         model.setObjectives(objectives, reduceUB);
         int[] lastSolution = new int[objectives.length];
-//>>>>>>> feature_multi_obj_manager
         try {
             while(solver.solve()){
                 paretoNonDominatedPoint.onSolution();
@@ -160,7 +150,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         } catch (Exception e) {
             System.err.println("Exception during solving: " + e.getMessage());
             e.printStackTrace();
-            foundSolution = false;
+            stopCriterionMet = true;
         }
         // Get statistics
         try {
@@ -172,12 +162,16 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         if (foundSolution) {
             paretoSolutions.add(solution);
             paretoNonDominatedPoint.prepareGIAMaximizerForNextSolution(lastSolution);
+        } else if (config.getCriteriaSelection() == GiaConfig.CriteriaSelection.NONE) {
+            exhaustive = solver.getSolutionCount() == 0 && solver.getSearchState().equals(SearchState.TERMINATED);
         }
         // reset to the initial state
-        if (solver.isStopCriterionMet() || (!foundSolution &&
-                (config.getCriteriaSelection() == GiaConfig.CriteriaSelection.NONE))) {
-            stopCondition = true;
-        } else {
+        if (solver.isStopCriterionMet()) {
+            stopCriterionMet = true;
+            exhaustive = solver.getSolutionCount() == 0 && solver.getSearchState().equals(SearchState.TERMINATED) &&
+                    (config.getCriteriaSelection() == GiaConfig.CriteriaSelection.NONE);
+        }
+        if (!stopCriterionMet && !exhaustive) {
             solver.reset(); // if reset is does not work, use the search strategy regionSearch
         }
         return foundSolution;

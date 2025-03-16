@@ -5,6 +5,7 @@ import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.Solver;
 import org.chocosolver.solver.constraints.Constraint;
+import org.chocosolver.solver.search.SearchState;
 import org.chocosolver.solver.variables.IntVar;
 
 import java.util.*;
@@ -24,6 +25,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
     private final List<Solution> solutions = new ArrayList<>();
     private final List<String> recorderList = new ArrayList<>();
     private boolean stopCriterionReached;
+    private boolean lastSearchTerminated;
     private final boolean performLexicographicOptimization;
     private boolean cannotUseSaugmeconObjective;
     protected int solveCallsCount;
@@ -31,6 +33,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
     public ParetoSaugmecon(boolean performLexicographicOptimization) {
         this.performLexicographicOptimization = performLexicographicOptimization;
         solveCallsCount = 0;
+        lastSearchTerminated = true;
     }
 
     public Object[] run(Model model, IntVar[] objectives, boolean maximize, int timeout) {
@@ -135,7 +138,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
                     solveCallsCount++;
                     solver.getMeasures().setRestartCount(solveCallsCount);
                 }
-                return false;
+                return objectives.length == 2 && lastSearchTerminated && efArray[idObjective] >= bestObjectiveValues[idObjective];
             } else {
                 efArray[idObjective] = efArray[idObjective] + 1;
                 if (idObjective > 1) {
@@ -148,7 +151,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
                     rwv[idObjective - 1] = bestObjectiveValues[idObjective];
                 } else {
                     if (idObjective == bestObjectiveValues.length - 1) {
-                        return true;
+                        return lastSearchTerminated;
                     } else {
                         return false;
                     }
@@ -156,7 +159,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
             }
         }
         if ((idObjective == bestObjectiveValues.length - 1) && efArray[idObjective] >= bestObjectiveValues[idObjective]) {
-            return true;
+            return lastSearchTerminated;
         } else {
             return false;
         }
@@ -349,9 +352,11 @@ public class ParetoSaugmecon implements TimeoutHolder {
 
     private Solution optimizeIntVar(IntVar objective, boolean maximize, boolean saveStats, boolean optimizeSaugmeconObjective) {
         Solution solution = null;
+        lastSearchTerminated = true;
         float remainingTimeout = updateSolverTimeoutCurrentTime(solver, timeout, startTime);
         if (remainingTimeout == 0) {
             stopCriterionReached = true;
+            lastSearchTerminated = false;
         }else{
             if (!solver.isStopCriterionMet()) {
                 if (optimizeSaugmeconObjective && cannotUseSaugmeconObjective){
@@ -370,6 +375,9 @@ public class ParetoSaugmecon implements TimeoutHolder {
                     solver.reset();
                 }else {
                     stopCriterionReached = true;
+                    if (!solver.getSearchState().equals(SearchState.TERMINATED)){
+                        lastSearchTerminated = false;
+                    }
                 }
             }
         }
