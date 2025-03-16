@@ -762,8 +762,10 @@ public final class Solver implements ISolver, IMeasures, IOutputFactory {
         }
         feasible = TRUE;
         mMeasures.incSolutionCount();
-        if (mModel.getResolutionPolicy() == ResolutionPolicy.SATISFACTION && mMeasures.getSolutionCount() == 1) {
-            mMeasures.updateTimeToBestSolution();
+        if (mModel.getResolutionPolicy() == ResolutionPolicy.SATISFACTION) {
+            if (mMeasures.getSolutionCount() == 1) {
+                mMeasures.updateTimeToBestSolution();
+            }
             objectivemanager.updateBestSolution();
         } else if (mModel.getResolutionPolicy() != ResolutionPolicy.SATISFACTION) {
             boolean bestSolutionHasBeenUpdated = objectivemanager.updateBestSolution();

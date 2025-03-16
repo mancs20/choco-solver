@@ -18,6 +18,9 @@ import org.chocosolver.solver.variables.Variable;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
 
@@ -47,8 +50,8 @@ public final class ObjectiveFactory {
      *
      * @return a singleton object
      */
-    public static IObjectiveManager<Variable> GIA(IntVar[] objectives) {
-        return GIAManager.getInstance(objectives);
+    public static IObjectiveManager<Variable> GIA(IntVar[] objectives, boolean tightUpperBound) {
+        return GIAManager.getInstance(objectives, tightUpperBound);
     }
 
     /**
@@ -229,42 +232,53 @@ class GIAManager implements IObjectiveManager<Variable> {
      * best lower bounds found so far
      **/
     protected int[] bestProvedLB;
-    protected int[] intialLB;
+    protected int[] initialLB;
 
     /**
      * best upper bounds found so far
      **/
     protected int[] bestProvedUB;
-    protected int[] intialUB;
+    protected int[] initialUB;
+
+    /**
+     * Tight upper bound considering the obtained front
+     **/
+    protected boolean tightUpperBound;
+
+    /**
+     * Pareto front
+     **/
+    protected List<int[]> paretoFront = new ArrayList<>();
 
     /**
      * Define how the cut should be updated when posting the cut
      **/
     transient protected IntUnaryOperator cutComputer = n -> n; // walking cut by default
 
-    private GIAManager(IntVar[] objectives) {
+    private GIAManager(IntVar[] objectives, boolean tightUpperBound) {
         this.objectives = objectives;
         this.bestProvedLB = new int[objectives.length];  // Initialize best bounds
         this.bestProvedUB = new int[objectives.length];
-        this.intialLB = new int[objectives.length];
-        this.intialUB = new int[objectives.length];
+        this.initialLB = new int[objectives.length];
+        this.initialUB = new int[objectives.length];
         for (int i = 0; i < objectives.length; i++) {
             bestProvedLB[i] = objectives[i].getLB();
-            intialLB[i] = objectives[i].getLB();
+            initialLB[i] = objectives[i].getLB();
             bestProvedUB[i] = objectives[i].getUB();
-            intialUB[i] = objectives[i].getUB();
+            initialUB[i] = objectives[i].getUB();
         }
+        this.tightUpperBound = tightUpperBound;
     }
 
     /**
      * Get the singleton instance. Throws an exception if not initialized.
      */
-    public static GIAManager getInstance(IntVar[] objectives) {
+    public static GIAManager getInstance(IntVar[] objectives, boolean tightUpperBound) {
         if (INSTANCE == null) {
-            INSTANCE = new GIAManager(objectives);
+            INSTANCE = new GIAManager(objectives, tightUpperBound);
         } else {
-            System.arraycopy(INSTANCE.intialLB, 0, INSTANCE.bestProvedLB, 0, INSTANCE.objectives.length);
-            System.arraycopy(INSTANCE.intialUB, 0, INSTANCE.bestProvedUB, 0, INSTANCE.objectives.length);
+            System.arraycopy(INSTANCE.initialLB, 0, INSTANCE.bestProvedLB, 0, INSTANCE.objectives.length);
+            System.arraycopy(INSTANCE.initialUB, 0, INSTANCE.bestProvedUB, 0, INSTANCE.objectives.length);
         }
         return INSTANCE;
     }
@@ -325,7 +339,71 @@ class GIAManager implements IObjectiveManager<Variable> {
                 bestProvedLB[i] = objectives[i].getValue();
             }
         }
+        if (tightUpperBound && improved) {
+            if (addNewPointToParetoFront()) {
+                updataUpperBounds();
+            }
+        }
         return improved;
+    }
+
+    private boolean addNewPointToParetoFront() {
+        if (paretoFront.isEmpty()) {
+            paretoFront.add(Arrays.copyOf(bestProvedLB, bestProvedLB.length));
+            return false;
+        }
+        boolean addNewPoint = false;
+        // if the bestProvedLB is improved, we can update the pareto front. There are two cases:
+        // 1. the new point has at least one objective lower than the last point of the pareto front, it means that a new
+        // non-dominated point is found and we are in the improvement phase.
+        // 2. the new point does not have any objective lower than the last point of the pareto front, it means that the
+        // last point of the pareto front is dominated by the new point and we need to replace it.
+        for (int i = 0; i < objectives.length; i++) {
+            if (bestProvedLB[i] < paretoFront.get(paretoFront.size() - 1)[i]) {
+                addNewPoint = true;
+                break;
+            }
+        }
+        int[] newPoint = Arrays.copyOf(bestProvedLB, bestProvedLB.length);
+        if (addNewPoint) {
+            paretoFront.add(newPoint);
+        } else {
+            paretoFront.set((paretoFront.size() - 1), newPoint);
+        }
+        return addNewPoint;
+    }
+
+    private void updataUpperBounds() {
+        for (int i = 0; i < bestProvedUB.length; i++) {
+            int[] dominatingPoint = computeDominatingPointLastObjectiveVal(i);
+            bestProvedUB[i] = computeLowestUBToAvoidDomination(dominatingPoint, i);
+        }
+    }
+
+    private int[] computeDominatingPointLastObjectiveVal(int i) {
+        int[] dp = Arrays.copyOf(bestProvedLB, bestProvedLB.length);
+        dp[i] = initialUB[i];
+        return dp;
+    }
+
+    private int computeLowestUBToAvoidDomination(int[] dominatingPoint, int i) {
+        int highestPossibleUpperBound = initialUB[i];
+        for (int j = 0; j < paretoFront.size() - 1; j++) {
+            if (dominates(dominatingPoint, paretoFront.get(j))) {
+                int currentPoint = paretoFront.get(j)[i] - 1;
+                if (highestPossibleUpperBound > currentPoint) {
+                    highestPossibleUpperBound = currentPoint;
+                }
+            }
+        }
+        return highestPossibleUpperBound;
+    }
+
+    private boolean dominates(int[] a, int[] b) {
+        for (int j = 0; j < objectives.length; j++) {
+            if (a[j] < b[j]) return false;
+        }
+        return true;
     }
 
     @Override
@@ -345,9 +423,17 @@ class GIAManager implements IObjectiveManager<Variable> {
 
     @Override
     public void postDynamicCut() throws ContradictionException {
+        // todo deal with the case where objectives are instantiated and equal to the bestProvedLB
+        boolean sameSolution = true;
         for (int i = 0; i < objectives.length; i++) {
             objectives[i].updateLowerBound(cutComputer.applyAsInt(bestProvedLB[i]), this);
             objectives[i].updateUpperBound(bestProvedUB[i], this);
+            if (!objectives[i].isInstantiated() || objectives[i].getValue() > bestProvedLB[i]) {
+                sameSolution = false;
+            }
+        }
+        if (sameSolution) {
+            throw new ContradictionException();
         }
     }
 }

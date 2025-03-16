@@ -38,13 +38,6 @@ public class ParetoMaximizerGIAImproveSolution extends Propagator<IntVar> implem
     public void propagate(int evtmask) throws ContradictionException {
         if (activated) {
             computeDominatedArea();
-            if (reduceUB) {
-                for (int i = 0; i < objectives.length; i++) {
-                    if (objectives[i].getUB() > highestCurrentUpperBounds[i]) {
-                        objectives[i].updateUpperBound(highestCurrentUpperBounds[i], this);
-                    }
-                }
-            }
         }
     }
 

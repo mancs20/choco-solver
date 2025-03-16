@@ -21,44 +21,10 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
 
     @Override
     public void onSolution() {
-//        // get objective values
-//        boolean saveSolution = true;
-//        if (portfolio) {
-//            saveSolution = saveSolutionPortfolio();
-//        }
-//        if (saveSolution) {
-//            for (int i = 0; i < n; i++) {
-//                lastObjectiveVal[i] = objectives[i].getValue();
-//            }
-//            setLastSolution(new Solution(model));
-//            lastSolution.record();
-//        }
-//        if (!improveSolution){
-//            improveSolution = true;
-//            if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
-//                    boundedType == GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES)){
-//                setLowestUpperBound();
-//            }
-//        }
         for (int i = 0; i < n; i++) {
             lastObjectiveVal[i] = objectives[i].getValue();
         }
-        if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
-                    boundedType == GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES)){
-            setLowestUpperBound();
-        }
         activated = false;
-    }
-
-    private boolean saveSolutionPortfolio() {
-        boolean saveSolution = true;
-        for (int i = 0; i < n; i++) {
-            if (objectives[i].getValue() < lastObjectiveVal[i]) {
-                saveSolution = false;
-                break;
-            }
-        }
-        return saveSolution;
     }
 
 //    @Override
@@ -70,20 +36,6 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
     public void propagate(int evtmask) throws ContradictionException {
         if (activated) {
             applyGavanelliFiltering();
-        }else{
-//            computeDominatedArea();
-//            if (!paretoFront.isEmpty() && (boundedType == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
-//                    boundedType == GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES)){
-////                verifyLowestUpperBound();
-//            }
-        }
-    }
-
-    private void verifyLowestUpperBound() throws ContradictionException {
-        for (int i = 0; i < objectives.length; i++) {
-            if (objectives[i].getUB() > highestCurrentUpperBounds[i]) {
-                objectives[i].updateUpperBound(highestCurrentUpperBounds[i], this);
-            }
         }
     }
 
@@ -216,7 +168,7 @@ public class ParetoMaximizerGIAClassic extends ParetoMaximizerGIAGeneral {
     }
 
     public void setLastObjectiveVal(int[] lastObjectiveVal) {
-        this.lastObjectiveVal = lastObjectiveVal;
+//        this.lastObjectiveVal = lastObjectiveVal;
     }
 }
 

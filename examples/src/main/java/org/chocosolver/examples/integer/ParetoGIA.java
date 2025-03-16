@@ -111,7 +111,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         boolean keepExploring = true;
         long solutionCount = 0;
         while (!stopCondition && keepExploring){
-            keepExploring = getFrontPoint();
+            keepExploring = getFrontPoint(reduceUB);
             solutionCount++;
             solver.getMeasures().setRestartCount(solutionCount);
         }
@@ -120,42 +120,21 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
 
     protected abstract ParetoMaximizerGIAGeneral setGIAPropagator(IntVar[] objectives, boolean portfolio);
 
-    protected boolean getFrontPoint(){
+    protected boolean getFrontPoint(boolean reduceUB){
         timeout = updateSolverTimeoutCurrentTime(solver, timeout, startTimeNano);
         boolean foundSolution = false;
         Solution solution = null;
         paretoOptimalPoint.setDeactivated();
-        model.setObjectives(objectives);
+        model.setObjectives(objectives, reduceUB);
         int[] lastSolution = new int[objectives.length];
         try {
             while(solver.solve()){
-                // todo delete is for testing
-                if (paretoSolutions.size() == 2){
-                    if (solver.getSolutionCount() == 3){
-                        System.out.println(solver.getMeasures().toString());
-                        solver.showDecisions(1000);
-                    }
-                }
-                // end todo
                 paretoNonDominatedPoint.onSolution();
-
                 foundSolution = true;
                 for (int i = 0; i < objectives.length; i++){
                     lastSolution[i] = objectives[i].getValue();
                 }
-
-                // todo delete is for testing
-                if (paretoSolutions.size() == 2) {
-                    System.out.println(Arrays.toString(lastSolution));
-                }
-                // end todo
-
                 paretoOptimalPoint.setActivated(lastSolution);
-                if (paretoSolutions.size() > 0 && (config.getBounded() == GiaConfig.BoundedType.DOMINATING_DOMINATES ||
-                        config.getBounded() == GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES)) {
-                    paretoOptimalPoint.setHighestCurrentUpperBounds(paretoNonDominatedPoint.getHighestCurrentUpperBounds());
-                }
-
                 solution = new Solution(model);
                 solution.record();
             }
@@ -166,9 +145,6 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         }
         // Get statistics
         try {
-            if (paretoSolutions.size() == 2){
-                System.out.println(solver.getMeasures().toString());
-            }
             recorderList.add(solver.getMeasures().toString());
         } catch (Exception e) {
             System.err.println("Exception recording stats: " + e.getMessage());

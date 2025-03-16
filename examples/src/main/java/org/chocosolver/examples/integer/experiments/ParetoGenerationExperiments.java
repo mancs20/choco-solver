@@ -332,7 +332,8 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
 
     private static void addTotalSolverStatsToJsonObject(Map<String, Object> orderedMap, String[] solverStats, float totalTime, boolean exhaustive, boolean cumulativeStats) {
         // Initialize sums
-        long totalSolutions = 0, totalNodes = 0, totalBacktracks = 0, totalBackjumps = 0, totalFails = 0, totalRestarts = 0;
+        long totalSolutions = 0, totalNodes = 0, totalBacktracks = 0, totalBackjumps = 0, totalFails = 0,
+                totalRestarts = 0, totalPropagations = 0;
         double totalBuildingTime = 0, totalResolutionTime = 0, averageNodePerSecond = 0;
         long count = 0; // For calculating averages
 
@@ -348,6 +349,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 totalBackjumps = stats.getBackjumps();
                 totalFails = stats.getFails();
                 totalRestarts = stats.getRestarts();
+                totalPropagations = stats.getPropagations();
             }
         } else{
             for (String element : solverStats) {
@@ -362,6 +364,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                     totalBackjumps += stats.getBackjumps();
                     totalFails += stats.getFails();
                     totalRestarts += stats.getRestarts();
+                    totalPropagations += stats.getPropagations();
                     count++;
                 }
             }
@@ -381,6 +384,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
         orderedMap.put("sum_solutions_backjumps", totalBackjumps);
         orderedMap.put("sum_solutions_fails", totalFails);
         orderedMap.put("sum_solutions_restarts", totalRestarts);
+        orderedMap.put("sum_solutions_propagations", totalPropagations);
     }
 }
 
@@ -394,6 +398,7 @@ class SolverStats {
     private final long backjumps;
     private final long fails;
     private final long restarts;
+    private final long propagations;
 
     private static final Pattern PATTERN = Pattern.compile(
             "Solutions: ([\\d,]+)\\s+"
@@ -406,11 +411,12 @@ class SolverStats {
             + "Backtracks: ([\\d,]+)\\s+"
             + "Backjumps: ([\\d,]+)\\s+"
             + "Fails: ([\\d,]+)\\s+"
-            + "Restarts: (\\d+)", Pattern.DOTALL);
+            + "Restarts: ([\\d,]+)\\s+"
+            + "Propagations: ([\\d,]+)", Pattern.DOTALL);
 
     // Constructor
     private SolverStats(long solutions, double buildingTime, double resolutionTime, long nodes, double nodePerSecond,
-                        long backtracks, long backjumps, long fails, long restarts) {
+                        long backtracks, long backjumps, long fails, long restarts, long propagations) {
         this.solutions = solutions;
         this.buildingTime = buildingTime;
         this.resolutionTime = resolutionTime;
@@ -420,6 +426,7 @@ class SolverStats {
         this.backjumps = backjumps;
         this.fails = fails;
         this.restarts = restarts;
+        this.propagations = propagations;
     }
 
     // Factory method for parsing
@@ -435,7 +442,8 @@ class SolverStats {
                     Long.parseLong(matcher.group(6).replace(",", "")),
                     Long.parseLong(matcher.group(7).replace(",", "")),
                     Long.parseLong(matcher.group(8).replace(",", "")),
-                    Long.parseLong(matcher.group(9))
+                    Long.parseLong(matcher.group(9).replace(",", "")),
+                    Long.parseLong(matcher.group(10).replace(",", ""))
             );
         }
         return null;
@@ -455,6 +463,7 @@ class SolverStats {
     public long getBackjumps() { return backjumps; }
     public long getFails() { return fails; }
     public long getRestarts() { return restarts; }
+    public long getPropagations() { return propagations; }
 }
 
 
