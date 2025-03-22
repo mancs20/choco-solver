@@ -970,4 +970,11 @@ public abstract class Propagator<V extends Variable> implements ICause, Identity
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
+
+    /**
+     * Reset variables used in solutions for certain propagators
+     */
+    public void resetAuxiliaryVariables() {
+        // nothing to do by default
+    }
 }

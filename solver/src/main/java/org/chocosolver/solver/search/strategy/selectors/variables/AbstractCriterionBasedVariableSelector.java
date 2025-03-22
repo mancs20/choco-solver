@@ -251,13 +251,14 @@ public abstract class AbstractCriterionBasedVariableSelector<V extends Variable>
             loop = 0;
         }
         tops.clear();
-        if (loop == flushThs) {
-            loop = 0;
-            return true;
-        } else {
-            tops.addAll(temp);
-            return false;
-        }
+        return true;
+//        if (loop == flushThs) {
+//            loop = 0;
+//            return true;
+//        } else {
+//            tops.addAll(temp);
+//            return false;
+//        }
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -335,4 +336,10 @@ public abstract class AbstractCriterionBasedVariableSelector<V extends Variable>
             }
         }
     }
+
+    public TObjectDoubleMap<Variable> getWeights() {
+        return weights;
+    }
+
+
 }

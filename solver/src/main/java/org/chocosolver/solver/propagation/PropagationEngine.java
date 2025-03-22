@@ -439,6 +439,9 @@ public class PropagationEngine {
     public void clear() {
         dynPropagators.clear();
         awake_queue.clear();
+//        for (Propagator p : propagators) {
+//            p.resetAuxiliaryVariables();
+//        }
         propagators.clear();
         notEmpty = 0;
         init = false;

@@ -102,4 +102,11 @@ public class IntStrategy extends AbstractStrategy<IntVar> {
         IntVar variable = variableSelector.getVariable(vars);
         return computeDecision(variable);
     }
+
+	/**
+	 * How a variable is selected
+	 */
+	public VariableSelector<IntVar> getVariableSelector() {
+		return variableSelector;
+	}
 }

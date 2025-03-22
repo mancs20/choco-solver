@@ -54,4 +54,9 @@ public class PropAllDiffBC extends Propagator<IntVar> {
         return ESat.TRUE; // redundant propagator (use PropAllDiffInst)
     }
 
+    @Override
+    public void resetAuxiliaryVariables(){
+        filter.reset(vars);
+    }
+
 }

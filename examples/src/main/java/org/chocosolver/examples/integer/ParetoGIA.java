@@ -173,6 +173,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         }
         if (!stopCriterionMet && !exhaustive) {
             solver.reset(); // if reset is does not work, use the search strategy regionSearch
+            solver.getSearchMonitors().afterRestart();
         }
         return foundSolution;
     }

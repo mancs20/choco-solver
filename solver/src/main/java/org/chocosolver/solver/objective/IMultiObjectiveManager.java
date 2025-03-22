@@ -32,13 +32,18 @@ public interface IMultiObjectiveManager {
         if (model.getSolver().getSearch() == null) {
             if (decisionVars.length == 0) {
                 IntVar[] notObjectivesVars = getNonObjectiveVariables(model, objectives);
-                model.getSolver().setSearch(Search.domOverWDegRefSearch(notObjectivesVars),
-                        Search.domOverWDegRefSearch(objectives));
+                model.getSolver().setSearch(Search.minDomLBSearch(notObjectivesVars));
             } else {
-                model.getSolver().setSearch(Search.domOverWDegRefSearch(decisionVars),
-                        Search.domOverWDegRefSearch(objectives));
-
+                model.getSolver().setSearch(Search.minDomLBSearch(decisionVars));
             }
+
+            //todo test
+            // objectives first
+//            IntVar[] vars = new IntVar[objectives.length + decisionVars.length];
+//            System.arraycopy(objectives, 0, vars, 0, objectives.length);
+//            System.arraycopy(decisionVars, 0, vars, objectives.length, decisionVars.length);
+            //keep trying this one, saving the weights during gavanelli stage
+//            model.getSolver().setSearch(Search.domOverWDegSearch(vars));
         }
     }
 }
