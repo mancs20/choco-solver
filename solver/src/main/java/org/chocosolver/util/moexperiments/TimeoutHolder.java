@@ -1,4 +1,4 @@
-package org.chocosolver.examples.integer.experiments.frontgenerators;
+package org.chocosolver.util.moexperiments;
 
 import org.chocosolver.solver.Solver;
 

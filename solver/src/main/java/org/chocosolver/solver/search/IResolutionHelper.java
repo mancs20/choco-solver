@@ -33,6 +33,7 @@ import org.chocosolver.solver.search.strategy.Search;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.ESat;
 import org.chocosolver.util.criteria.Criterion;
+import org.chocosolver.util.moexperiments.TimeBasedSolutionPrinter;
 import org.chocosolver.util.objects.setDataStructures.iterable.IntIterableRangeSet;
 import org.chocosolver.util.tools.ArrayUtils;
 
@@ -504,28 +505,25 @@ public interface IResolutionHelper extends ISelf<Solver> {
         return pareto.getParetoFront();
     }
 
-    default Object[] findParetoFrontWithFrontEvolutionInfo(IntVar[] objectives, boolean maximize, Criterion... stop) {
+    default List<Solution> findParetoFrontWithFrontEvolutionInfo(IntVar[] objectives, boolean maximize, Criterion... stop) {
         ref().addStopCriterion(stop);
         ref().getModel().clearObjective();
+        TimeBasedSolutionPrinter recorder = new TimeBasedSolutionPrinter();
         ParetoMaximizer pareto = new ParetoMaximizer(
                 Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new)
         );
         Constraint c = new Constraint("PARETO", pareto);
         c.post();
-        List<String> recorderList = new ArrayList<>();
-        List<Solution> allSolutions = new ArrayList<>();
         try {
             while (ref().solve()) {
                 pareto.onSolution();
-                recorderList.add(ref().getMeasures().toString());
-                allSolutions.add(pareto.getLastParetoFrontSolution());
+                recorder.onNewSolution(pareto.getParetoFrontValues());
             }
         } catch (Exception e) {
             System.err.println("Exception during solving: " + e.getMessage());
             e.printStackTrace();
         } finally {
             try {
-                recorderList.add(ref().getMeasures().toString());
                 ref().removeStopCriterion(stop);
                 ref().getModel().unpost(c);
             } catch (Exception e) {
@@ -533,7 +531,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 e.printStackTrace();
             }
         }
-        return new Object[]{pareto.getParetoFront(), recorderList, allSolutions};
+        recorder.onEnd();
+        return pareto.getParetoFront();
     }
 
 
@@ -656,7 +655,8 @@ public interface IResolutionHelper extends ISelf<Solver> {
     default Object[] findParetoFrontByDisjunctiveProgramming(IntVar[] objectives, boolean maximize, float timeout,
                                                              Criterion... stop) throws Exception {
         long startTimeNano = System.nanoTime();
-        float remainingTime = 0;
+        TimeBasedSolutionPrinter recorder = new TimeBasedSolutionPrinter();
+        float remainingTime;
         // convert to minimization
         objectives = Stream.of(objectives).map(o -> maximize ? ref().getModel().neg(o) : o).toArray(IntVar[]::new);
 
@@ -683,8 +683,11 @@ public interface IResolutionHelper extends ISelf<Solver> {
             ref().getModel().setObjective(false, objectives[idObjective]);
             ref().addStopCriterion(stop);
             Solution solution = new Solution(ref().getModel());
+
+            recorder.setFirstSolution(true);
             while (ref().solve()) {
                 solution.record();
+                recorder.onNewSolution(solution, objectives);
             }
             ref().removeStopCriterion(stop);
 
@@ -736,14 +739,16 @@ public interface IResolutionHelper extends ISelf<Solver> {
             }
             remainingTime = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
             if (remainingTime == 0){
-                timeoutReached = true;
                 break;
             }
 
             ref().addStopCriterion(stop);
             Solution solution = new Solution(ref().getModel());
+            recorder.setFirstSolution(true);
             while (ref().solve()) {
                 solution.record();
+                // print solution
+                recorder.onNewSolution(solution, objectives);
             }
             ref().removeStopCriterion(stop);
 
@@ -795,6 +800,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
         }
 
         ref().removeStopCriterion(stop);
+        recorder.onEnd();
         return new Object[]{paretoSolutions, recorderList, !keepExploring};
     }
 
@@ -1017,6 +1023,48 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 sol = new Solution(ref().getModel());
             }
             sol.record();
+            // 3. extract values of each objective
+            int[] bestFound = new int[objectives.length];
+            for (int vIdx = 0; vIdx < objectives.length; vIdx++) {
+                bestFound[vIdx] = sol.getIntVal(objectives[vIdx]) * (maximize ? -1 : 1);
+            }
+            // 4. either update the constraint, or declare it if first solution
+            if (plint != null) {
+                plint.update(bestFound, true);
+            } else {
+                plint = new PropLexInt(mobj, bestFound, true, true);
+                //noinspection unchecked
+                clint = new Constraint("lex objectives", (Propagator<IntVar>) plint);
+                clint.post();
+            }
+        }
+        if (clint != null) {
+            ref().getModel().unpost(clint);
+        }
+        ref().removeStopCriterion(stop);
+        return sol;
+    }
+
+    default Solution findLexOptimalSolution(IntVar[] objectives, boolean maximize, TimeBasedSolutionPrinter recorder, Criterion... stop) {
+        if (objectives == null || objectives.length == 0) {
+            return findSolution(stop);
+        }
+        ref().addStopCriterion(stop);
+        Solution sol = null;
+        Constraint clint = null;
+        UpdatablePropagator<int[]> plint = null;
+        // 1. copy objective variables and transform it if necessary
+        IntVar[] mobj = new IntVar[objectives.length];
+        for (int i = 0; i < objectives.length; i++) {
+            mobj[i] = maximize ? ref().getModel().neg(objectives[i]) : objectives[i];
+        }
+        // 2. try to find a first solution
+        while (ref().solve()) {
+            if (sol == null) {
+                sol = new Solution(ref().getModel());
+            }
+            sol.record();
+            recorder.onNewSolution(sol, objectives);
             // 3. extract values of each objective
             int[] bestFound = new int[objectives.length];
             for (int vIdx = 0; vIdx < objectives.length; vIdx++) {

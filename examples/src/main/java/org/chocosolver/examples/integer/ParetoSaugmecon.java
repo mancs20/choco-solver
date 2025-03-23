@@ -1,6 +1,7 @@
 package org.chocosolver.examples.integer;
 
-import org.chocosolver.examples.integer.experiments.frontgenerators.TimeoutHolder;
+import org.chocosolver.util.moexperiments.TimeBasedSolutionPrinter;
+import org.chocosolver.util.moexperiments.TimeoutHolder;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.Solver;
@@ -29,6 +30,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
     private final boolean performLexicographicOptimization;
     private boolean cannotUseSaugmeconObjective;
     protected int solveCallsCount;
+    private TimeBasedSolutionPrinter recorder;
 
     public ParetoSaugmecon(boolean performLexicographicOptimization) {
         this.performLexicographicOptimization = performLexicographicOptimization;
@@ -38,6 +40,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
 
     public Object[] run(Model model, IntVar[] objectives, boolean maximize, int timeout) {
         startTime = System.nanoTime();
+        recorder = new TimeBasedSolutionPrinter();
         this.timeout = timeout;
         this.model = model;
         solver = this.model.getSolver();
@@ -70,6 +73,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
             Set<String> previousSolutions = new HashSet<>();
             List<SolutionEfArrayInformation> previousSolutionInformation = new ArrayList<>();
             exhaustive = saugmeconLoop(efArray, rwv, bestObjectiveValues.length, previousSolutionInformation, previousSolutions);
+            recorder.onEnd();
             allSolutions = new ArrayList<>(solutions);
             // remove the solutions that are dominated by the front
             if (!performLexicographicOptimization && (cannotUseSaugmeconObjective || objectives.length > 2)){
@@ -360,18 +364,25 @@ public class ParetoSaugmecon implements TimeoutHolder {
             lastSearchTerminated = false;
         }else{
             if (!solver.isStopCriterionMet()) {
+                if (saveStats) {
+                    recorder.setFirstSolution(true);
+                }
                 solution = new Solution(model);
                 if (optimizeSaugmeconObjective && cannotUseSaugmeconObjective){
                     if (performLexicographicOptimization){
-                        solution = solver.findLexOptimalSolution(objectives, maximize);
+                        solution = solver.findLexOptimalSolution(objectives, maximize, recorder);
                     }else{
                         while (solver.solve()){
                             solution.record();
+                            recorder.onNewSolution(solution, objectives);
                         }
                     }
                 }else{
                     while (solver.solve()){
                         solution.record();
+                        if (saveStats){
+                            recorder.onNewSolution(solution, objectives);
+                        }
                     }
                 }
                 solver.removeStopCriterion();

@@ -1,6 +1,6 @@
 package org.chocosolver.examples.integer.moexperiments;
 
-import org.chocosolver.examples.integer.experiments.frontgenerators.TimeoutHolder;
+import org.chocosolver.util.moexperiments.TimeoutHolder;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solver;
 import org.testng.annotations.Test;

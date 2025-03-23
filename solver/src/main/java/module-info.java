@@ -190,4 +190,5 @@ module org.chocosolver.solver {
     opens org.chocosolver.solver.search.loop.move to sizeof;
     opens org.chocosolver.memory.structure to sizeof;
     opens org.chocosolver.solver.search.loop to sizeof;
+    exports org.chocosolver.util.moexperiments;
 }

@@ -15,7 +15,8 @@ package org.chocosolver.examples.integer;/*
  */
 
 import org.chocosolver.examples.integer.experiments.benchmarkreader.ModelObjectivesVariables;
-import org.chocosolver.examples.integer.experiments.frontgenerators.TimeoutHolder;
+import org.chocosolver.util.moexperiments.TimeBasedSolutionPrinter;
+import org.chocosolver.util.moexperiments.TimeoutHolder;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.ParallelPortfolio;
 import org.chocosolver.solver.Solution;
@@ -54,6 +55,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
     protected boolean stopCriterionMet;
     protected boolean exhaustive;
     private long startTime;
+    private TimeBasedSolutionPrinter recorder;
 
     public ParetoGIA(GiaConfig config, int timeout) {
         this.config = config;
@@ -66,6 +68,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
     public Object[] run(boolean maximize, Model model, IntVar[] objectives) {
         // Optimise independently two variables using the Pareto optimizer
         startTime = System.nanoTime();
+        recorder = new TimeBasedSolutionPrinter();
         preparation(maximize, model, objectives);
         Object[] solutionsAndStats = new Object[0];
         try {
@@ -119,6 +122,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
             solutionCount++;
             solver.getMeasures().setRestartCount(solutionCount);
         }
+        recorder.onEnd();
         return new Object[]{paretoSolutions, recorderList, exhaustive};
     }
 
@@ -137,6 +141,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
         model.setObjectives(objectives, reduceUB);
         int[] lastSolution = new int[objectives.length];
         try {
+            recorder.setFirstSolution(true);
             while(solver.solve()){
                 paretoNonDominatedPoint.onSolution();
                 foundSolution = true;
@@ -146,6 +151,7 @@ abstract public class ParetoGIA implements TimeoutHolder, IMultiObjectiveManager
                 paretoOptimalPoint.setActivated(lastSolution);
                 solution = new Solution(model);
                 solution.record();
+                recorder.onNewSolution(solution, objectives);
             }
         } catch (Exception e) {
             System.err.println("Exception during solving: " + e.getMessage());

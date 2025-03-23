@@ -90,8 +90,8 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
         return paretoSolutions;
     }
 
-    public Solution getLastParetoFrontSolution() {
-        return paretoSolutions.get(paretoSolutions.size() - 1).copySolution();
+    public List<int[]> getParetoFrontValues() {
+        return paretoFront;
     }
 
     @Override

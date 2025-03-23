@@ -10,14 +10,12 @@ import java.util.List;
 public class ParetoGavanelliFrontEvolutionInfo {
 
     public Object[] run(Model model, IntVar[] objectives, boolean maximize) {
-        // Optimise independently two variables using the Pareto optimizer
-        Object[] solutionsAndStats;
-        solutionsAndStats = model.getSolver().findParetoFrontWithFrontEvolutionInfo(objectives, maximize);
-        List<Solution> solutions = (List<Solution>) solutionsAndStats[0];
-        List<String> stats = (List<String>) solutionsAndStats[1];
-        List<Solution> allSolutions = (List<Solution>) solutionsAndStats[2];
-        boolean exhaustive = (boolean) solutionsAndStats[3];
+        // Find the Pareto front using the Pareto optimizer
+        List<Solution> solutions = model.getSolver().findParetoFrontWithFrontEvolutionInfo(objectives, maximize);
+        // stats
+        List<String> recorderList = new ArrayList<>();
+        recorderList.add(model.getSolver().getMeasures().toString());
 
-        return new Object[]{solutions, stats, allSolutions, exhaustive};
+        return new Object[]{solutions, recorderList};
     }
 }
