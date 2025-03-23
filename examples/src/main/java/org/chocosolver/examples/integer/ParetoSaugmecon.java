@@ -8,6 +8,7 @@ import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.search.SearchState;
 import org.chocosolver.solver.variables.IntVar;
 
+import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -21,7 +22,6 @@ public class ParetoSaugmecon implements TimeoutHolder {
     private Solver solver;
     private Model model;
     private IntVar[] objectives;
-    private IntVar saugmeconObjective;
     private final List<Solution> solutions = new ArrayList<>();
     private final List<String> recorderList = new ArrayList<>();
     private boolean stopCriterionReached;
@@ -51,7 +51,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
         boolean exhaustive = false;
         if (!stopCriterionReached){
             // Add the saugmecon objective
-            setSaugmeconObjective();
+            setSaugmeconObjective(maximize);
             // initialize the epsilon array, ef2 = nadir2 - 1
             int[] efArray = new int[nadirObjectiveValues.length];
             for (int i = 0; i < nadirObjectiveValues.length; i++) {
@@ -125,7 +125,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
     }
 
     private boolean saugmeconLoop(int[] efArray, int[] rwv, int idObjective,
-                               List<SolutionEfArrayInformation> previousSolutionInformation, Set<String> previousSolutions) {
+                                  List<SolutionEfArrayInformation> previousSolutionInformation, Set<String> previousSolutions) {
         if (stopCriterionReached) {
             return false;
         }
@@ -191,7 +191,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
         } else {
             // update right-hand side values (rhs) for the objective constraints
             updateObjectiveConstraints(efArray);
-            Solution solution = optimizeIntVar(saugmeconObjective, true, true, true);
+            Solution solution = optimizeIntVar(true, true, true);
             if (stopCriterionReached){
                 if (solution != null) {
                     solutions.add(solution);
@@ -337,7 +337,8 @@ public class ParetoSaugmecon implements TimeoutHolder {
         int[] objectivesValues = new int[objectives.length - 1];
         for (int i = 1; i < objectives.length; i++) {
             IntVar objective = objectives[i];
-            Solution solution = optimizeIntVar(objective, maximize, searchForBestObjectivesValues, false);
+            model.setObjective(maximize, objective);
+            Solution solution = optimizeIntVar(maximize, searchForBestObjectivesValues, false);
             if (solution != null) {
                 objectivesValues[i - 1] = solution.getIntVal(objective);
                 if (searchForBestObjectivesValues) {
@@ -350,7 +351,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
         return objectivesValues;
     }
 
-    private Solution optimizeIntVar(IntVar objective, boolean maximize, boolean saveStats, boolean optimizeSaugmeconObjective) {
+    private Solution optimizeIntVar(boolean maximize, boolean saveStats, boolean optimizeSaugmeconObjective) {
         Solution solution = null;
         lastSearchTerminated = true;
         float remainingTimeout = updateSolverTimeoutCurrentTime(solver, timeout, startTime);
@@ -359,17 +360,25 @@ public class ParetoSaugmecon implements TimeoutHolder {
             lastSearchTerminated = false;
         }else{
             if (!solver.isStopCriterionMet()) {
+                solution = new Solution(model);
                 if (optimizeSaugmeconObjective && cannotUseSaugmeconObjective){
                     if (performLexicographicOptimization){
                         solution = solver.findLexOptimalSolution(objectives, maximize);
                     }else{
-                        solution = solver.findOptimalSolution(objectives[0], maximize);
+                        while (solver.solve()){
+                            solution.record();
+                        }
                     }
                 }else{
-                    solution = solver.findOptimalSolution(objective, maximize);
+                    while (solver.solve()){
+                        solution.record();
+                    }
                 }
-                if (solution != null && saveStats) {
+                solver.removeStopCriterion();
+                if (solution != null && solution.exists() && saveStats) {
                     recorderList.add(solver.getMeasures().toString());
+                } else {
+                    solution = null;
                 }
                 if (!solver.isStopCriterionMet()){
                     solver.reset();
@@ -384,7 +393,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
         return solution;
     }
 
-    private void setSaugmeconObjective() {
+    private void setSaugmeconObjective(boolean maximize) {
         // check if the saugmecon objective can be calculated as in the paper. If the objectives are too big,
         // the coefficients in the objective function will exceed the int limit. In this case, there are two options:
         // 1. optimize objective 1 and at the end check if there are some solutions that do not belong to the pareto
@@ -398,60 +407,73 @@ public class ParetoSaugmecon implements TimeoutHolder {
         cannotUseSaugmeconObjective = false;
         int lbSaugmeconObjective = 0;
         int ubSaugmeconObjective = 0;
-
-        // obj = f1 + eps * (f2/r2 + ... + fn/rn)
-        // as we are using integer values, we can use the following formula range_multiplier = (r2*...rn) and 1/eps
-        // obj = f1 * range_multiplier * (1 / eps) + range_multiplier * (f2/r2 + ... + fn/rn)
-        // calculate the range for each objective
-        int[] range = new int[bestObjectiveValues.length];
-        for (int i = 0; i < bestObjectiveValues.length; i++) {
-            range[i] = Math.abs(bestObjectiveValues[i] - nadirObjectiveValues[i]);
-        }
-        int rangeMultiplier = 1;
-        for (int rangeI : range) {
-            if (rangeMultiplier > Integer.MAX_VALUE / rangeI) {
-                cannotUseSaugmeconObjective = true;
-                lbSaugmeconObjective = objectives[0].getLB();
-                ubSaugmeconObjective = objectives[0].getUB();
-                break;
-            }
-            rangeMultiplier *= rangeI;
-        }
-
         int[] coefficients = new int[objectives.length];
-        if (!cannotUseSaugmeconObjective) {
-            // calculate the 1/eps value
-            // eps <= (1 / (f2_max/r2 + ... + fn_max/rn))
-            // (f2_max/r2 + ... + fn_max/rn) <= 1/eps
-            // 1/eps >= (f2_max/r2 + ... + fn_max/rn) + k, where k is a small value, for integer values we can use 1
-            double inverseEps = 1.0;
+
+        if (objectives.length > 2) {
+            // obj = f1 + eps * (f2/r2 + ... + fn/rn)
+            // as we are using integer values, we can use the following formula range_multiplier = (r2*...rn) and 1/eps
+            // obj = f1 * range_multiplier * (1 / eps) + range_multiplier * (f2/r2 + ... + fn/rn)
+            // calculate the range for each objective
+            int[] range = new int[bestObjectiveValues.length];
             for (int i = 0; i < bestObjectiveValues.length; i++) {
-                inverseEps += (float) Math.max(bestObjectiveValues[i], nadirObjectiveValues[i]) / (float) range[i];
+                range[i] = Math.abs(bestObjectiveValues[i] - nadirObjectiveValues[i]);
             }
-            //saugmeconObjective = f1 * range_multiplier * (1 / eps) + range_multiplier * (f2/r2 + ... + fn/rn)
-            coefficients[0] = (int) (rangeMultiplier * inverseEps);
-            for (int i = 1; i < objectives.length; i++) {
-                coefficients[i] = rangeMultiplier / range[i - 1];
+            int rangeMultiplier;
+            rangeMultiplier = (int) lcm(range);
+            if (rangeMultiplier >= Integer.MAX_VALUE) {
+                cannotUseSaugmeconObjective = true;
             }
 
-            for (int i = 0; i < objectives.length; i++) {
-                if (Math.abs((long)((Integer.MAX_VALUE - lbSaugmeconObjective) / coefficients[i])) < Math.max(Math.abs(objectives[i].getUB()), Math.abs(objectives[i].getLB()))) {
-                    cannotUseSaugmeconObjective = true;
-                    lbSaugmeconObjective = objectives[0].getLB();
-                    ubSaugmeconObjective = objectives[0].getUB();
-                    break;
+            if (!cannotUseSaugmeconObjective) {
+                // calculate the 1/eps value
+                // eps <= (1 / (f2_max/r2 + ... + fn_max/rn))
+                // (f2_max/r2 + ... + fn_max/rn) <= 1/eps
+                // 1/eps >= (f2_max/r2 + ... + fn_max/rn) + k, where k is a small value, for integer values we can use 1
+                double inverseEps = 1.0;
+                for (int i = 0; i < bestObjectiveValues.length; i++) {
+                    inverseEps += (float) Math.max(bestObjectiveValues[i], nadirObjectiveValues[i]) / (float) range[i];
                 }
+                //saugmeconObjective = f1 * range_multiplier * (1 / eps) + range_multiplier * (f2/r2 + ... + fn/rn)
+                coefficients[0] = (int) (rangeMultiplier * inverseEps);
+                for (int i = 1; i < objectives.length; i++) {
+                    coefficients[i] = rangeMultiplier / range[i - 1];
+                }
+
+                for (int i = 0; i < objectives.length; i++) {
+                    if (Math.abs((long) ((Integer.MAX_VALUE) / coefficients[i])) <= Math.max(Math.abs(objectives[i].getUB()), Math.abs(objectives[i].getLB()))) {
+                        cannotUseSaugmeconObjective = true;
+                        break;
+                    }
+                    lbSaugmeconObjective += coefficients[i] * objectives[i].getLB();
+                    ubSaugmeconObjective += coefficients[i] * objectives[i].getUB();
+                }
+                if (Math.max(Math.abs(ubSaugmeconObjective), Math.abs(lbSaugmeconObjective)) >= Integer.MAX_VALUE) {
+                    cannotUseSaugmeconObjective = true;
+                }
+            }
+        } else {
+            coefficients[0] = Math.max(Math.abs(objectives[1].getUB()), Math.abs(objectives[1].getLB()));
+            coefficients[1] = 1;
+            if (Math.abs((long) ((Integer.MAX_VALUE) / coefficients[0])) <= Math.max(Math.abs(objectives[0].getUB()), Math.abs(objectives[0].getLB()))) {
+                cannotUseSaugmeconObjective = true;
+            }
+            for (int i = 0; i < objectives.length; i++) {
                 lbSaugmeconObjective += coefficients[i] * objectives[i].getLB();
                 ubSaugmeconObjective += coefficients[i] * objectives[i].getUB();
             }
+            if (Math.max(Math.abs(ubSaugmeconObjective), Math.abs(lbSaugmeconObjective)) >= Integer.MAX_VALUE) {
+                cannotUseSaugmeconObjective = true;
+            }
         }
         if (!cannotUseSaugmeconObjective) {
-            saugmeconObjective = model.intVar("saugmeconObjective", lbSaugmeconObjective, ubSaugmeconObjective);
+            IntVar saugmeconObjective = model.intVar("saugmeconObjective", lbSaugmeconObjective, ubSaugmeconObjective);
             IntVar[] saugmeconObjectiveArr = new IntVar[objectives.length];
             System.arraycopy(objectives, 0, saugmeconObjectiveArr, 0, objectives.length);
             model.scalar(saugmeconObjectiveArr, coefficients, "=", saugmeconObjective).post();
+            model.setObjective(maximize, saugmeconObjective);
         }else{
             solver.getModel().getObjective().getModel().clearObjective();
+            System.out.println("Lexicographic optimization is used. Saugmecon objective is bigger than Integer.MAX_VALUE");
         }
     }
 
@@ -512,6 +534,23 @@ public class ParetoSaugmecon implements TimeoutHolder {
             }
         }
         return dominates;
+    }
+
+    private static long lcm(long a, long b) {
+        return Math.abs(a * b) / BigInteger.valueOf(a).gcd(BigInteger.valueOf(b)).longValue();
+    }
+
+    // Compute LCM of an array of numbers
+    private static long lcm(int[] numbers) {
+        if (numbers == null || numbers.length == 0) {
+            throw new IllegalArgumentException("Input array must not be empty");
+        }
+
+        long result = numbers[0];
+        for (int i = 1; i < numbers.length; i++) {
+            result = lcm(result, numbers[i]);
+        }
+        return result;
     }
 }
 

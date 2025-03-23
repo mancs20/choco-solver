@@ -20,7 +20,8 @@ public class ParetoDisjunctiveProgramming {
         }
         List<Solution> solutions = (List<Solution>) solutionsAndStats[0];
         List<String> stats = (List<String>) solutionsAndStats[1];
+        boolean exhaustive = (boolean) solutionsAndStats[2];
 
-        return new Object[]{solutions, stats};
+        return new Object[]{solutions, stats, exhaustive};
     }
 }

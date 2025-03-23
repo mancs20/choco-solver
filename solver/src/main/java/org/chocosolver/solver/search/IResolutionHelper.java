@@ -667,7 +667,6 @@ public interface IResolutionHelper extends ISelf<Solver> {
         List<String> recorderList = new ArrayList<>();
 
         // stop criterion
-        ref().addStopCriterion(stop);
         boolean timeoutReached = false;
 
         // find the minimum values for each objective k
@@ -680,7 +679,15 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 timeoutReached = true;
                 break;
             }
-            Solution solution = findOptimalSolution(objectives[idObjective], false, stop);
+
+            ref().getModel().setObjective(false, objectives[idObjective]);
+            ref().addStopCriterion(stop);
+            Solution solution = new Solution(ref().getModel());
+            while (ref().solve()) {
+                solution.record();
+            }
+            ref().removeStopCriterion(stop);
+
             recorderList.add(ref().getMeasures().toString());
 
             if (ref().isStopCriterionMet()){
@@ -690,7 +697,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 solveCallsCount++;
                 ref().getMeasures().setRestartCount(solveCallsCount);
             }
-            if (solution != null){
+            if (solution.exists()){
                 // TODO add temp solution to the ParetoFront and remove it later if it is not a Pareto optimal solution
                 b[idObjective] = solution.getIntVal(objectives[idObjective]);
                 ref().getModel().arithm(objectives[idObjective], ">=", b[idObjective]).post();
@@ -709,6 +716,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
         }
         IntVar objectiveSum = ref().getModel().intVar("objectiveSum", LBsum, UBsum);
         ref().getModel().sum(objectives, "=", objectiveSum).post();
+        ref().getModel().setObjective(false, objectiveSum);
 
         int[] currentDisjunction = new int[objectives.length];
         for (int i = 0; i < objectives.length; i++) {
@@ -731,11 +739,17 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 timeoutReached = true;
                 break;
             }
-            Solution solution = findOptimalSolution(objectiveSum, false, stop);
+
+            ref().addStopCriterion(stop);
+            Solution solution = new Solution(ref().getModel());
+            while (ref().solve()) {
+                solution.record();
+            }
+            ref().removeStopCriterion(stop);
 
             // Get statistics
             recorderList.add(ref().getMeasures().toString());
-            if (solution != null){
+            if (solution.exists()){
                 disjunctions.put(Arrays.toString(currentDisjunction), "explored");
                 int[] solutionObjectives = new int[objectives.length];
                 for (int i = 0; i < objectives.length; i++) {
@@ -781,7 +795,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
         }
 
         ref().removeStopCriterion(stop);
-        return new Object[]{paretoSolutions, recorderList};
+        return new Object[]{paretoSolutions, recorderList, !keepExploring};
     }
 
     private ArrayList<String> getNewDisjunctions(int[] conjunctionTarget, int[] disjunctionsNew){
@@ -878,7 +892,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
     //  unsatisfaction. The difference is that in unsatisfaction we don't optimize, here we optimize the sum of the
     //  objectives
     default Object[] findParetoFrontByDisjunctiveProgrammingSelRegionLikeImproveAll(IntVar[] objectives, boolean maximize, float timeout,
-                                                             Criterion... stop) throws Exception {
+                                                                                    Criterion... stop) throws Exception {
         long startTimeNano = System.nanoTime();
 
         List<Solution> paretoSolutions = new ArrayList<>();
