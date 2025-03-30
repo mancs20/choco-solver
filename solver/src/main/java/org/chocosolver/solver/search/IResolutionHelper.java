@@ -735,7 +735,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
             disjunctions.put(Arrays.toString(currentDisjunction), "feasible");
         }
 
-        while (keepExploring && !timeoutReached && paretoSolutions.size() < 2){
+        while (keepExploring && !timeoutReached){
             // post current disjunction constraint
             for (int i = 0; i < objectives.length; i++) {
                 constraintObjectives[i] = ref().getModel().arithm(objectives[i], "<", currentDisjunction[i]);
@@ -743,6 +743,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
             }
             remainingTime = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
             if (remainingTime == 0){
+                timeoutReached = true;
                 break;
             }
 
