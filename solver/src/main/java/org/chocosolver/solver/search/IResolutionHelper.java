@@ -671,6 +671,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
 
         // find the minimum values for each objective k
         int[] b = new int[objectives.length];
+        List<Solution> solutionsB = new ArrayList<>();
         int idObjective = 0;
         int solveCallsCount = 0;
         while (!timeoutReached && idObjective < objectives.length){
@@ -705,33 +706,36 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 b[idObjective] = solution.getIntVal(objectives[idObjective]);
                 ref().getModel().arithm(objectives[idObjective], ">=", b[idObjective]).post();
                 idObjective++;
+                solutionsB.add(solution);
             }else{
                 throw new Exception("No solution found for the objective " + idObjective);
             }
         }
 
-        // create objective function
-        int LBsum = 0;
-        int UBsum = 0;
-        for (int i = 0; i < objectives.length; i++) {
-            LBsum += b[i];
-            UBsum += objectives[i].getUB();
-        }
-        IntVar objectiveSum = ref().getModel().intVar("objectiveSum", LBsum, UBsum);
-        ref().getModel().sum(objectives, "=", objectiveSum).post();
-        ref().getModel().setObjective(false, objectiveSum);
-
         int[] currentDisjunction = new int[objectives.length];
-        for (int i = 0; i < objectives.length; i++) {
-            currentDisjunction[i] = objectives[i].getUB() + 1;
-        }
-        HashMap<String, String> disjunctions = new HashMap<>();
-        disjunctions.put(Arrays.toString(currentDisjunction), "feasible");
-
         Constraint[] constraintObjectives = new Constraint[objectives.length];
         boolean keepExploring = true;
+        HashMap<String, String> disjunctions = new HashMap<>();
 
-        while (keepExploring && !timeoutReached){
+        if (!timeoutReached) {
+            // create objective function
+            int LBsum = 0;
+            int UBsum = 0;
+            for (int i = 0; i < objectives.length; i++) {
+                LBsum += b[i];
+                UBsum += objectives[i].getUB();
+            }
+            IntVar objectiveSum = ref().getModel().intVar("objectiveSum", LBsum, UBsum);
+            ref().getModel().sum(objectives, "=", objectiveSum).post();
+            ref().getModel().setObjective(false, objectiveSum);
+
+            for (int i = 0; i < objectives.length; i++) {
+                currentDisjunction[i] = objectives[i].getUB() + 1;
+            }
+            disjunctions.put(Arrays.toString(currentDisjunction), "feasible");
+        }
+
+        while (keepExploring && !timeoutReached && paretoSolutions.size() < 2){
             // post current disjunction constraint
             for (int i = 0; i < objectives.length; i++) {
                 constraintObjectives[i] = ref().getModel().arithm(objectives[i], "<", currentDisjunction[i]);
@@ -798,10 +802,56 @@ public interface IResolutionHelper extends ISelf<Solver> {
                 ref().getMeasures().setRestartCount(solveCallsCount);
             }
         }
+        recorder.onEnd();
+
+        if (timeoutReached){
+            System.out.println("Stop criterion reached, the Pareto front is incomplete");
+            // check if the elements in recorderList that were found while optimizing individual objectives should
+            // be removed from the Pareto front approximation
+            for (int i = 0; i < solutionsB.size(); i++) {
+                // set k to -1 to check if a solution that doesn't belong to the front is dominated by the front
+                if (paretoSolutions.size() == 0 || (!solutionKisDominatedByTheFrontInMinimization(solutionsB.get(i), paretoSolutions, -1, objectives))) {
+                    // if the solution is not dominated by the front, add it to the front at index i
+                    paretoSolutions.add(i, solutionsB.get(i));
+                } else {
+                    // if the solution is dominated by the front, remove it from the recorderList
+                    recorderList.set(i, "No solution" + recorderList.get(i));
+                }
+            }
+        } else {
+            // remove the elements in recorderList that were found while optimizing individual objectives
+            for (int i = 0; i < paretoSolutions.size(); i++) {
+                recorderList.set(i, "No solution" + recorderList.get(i));
+            }
+        }
 
         ref().removeStopCriterion(stop);
-        recorder.onEnd();
         return new Object[]{paretoSolutions, recorderList, !keepExploring};
+    }
+
+    private boolean solutionKisDominatedByTheFrontInMinimization(Solution newSolution, List<Solution> front, int k, IntVar[] objectives) {
+        boolean newSolutionIsDominated = false;
+        // at this point is possible that the
+        for (int i = 0; i < front.size(); i++) {
+            if (i != k){
+                if (solutionADominatesBInMinimization(front.get(i), newSolution, objectives)) {
+                    newSolutionIsDominated = true;
+                    break;
+                }
+            }
+        }
+        return newSolutionIsDominated;
+    }
+
+    private boolean solutionADominatesBInMinimization(Solution solutionA, Solution solutionB, IntVar[] objectives) {
+        boolean dominates = true;
+        for (IntVar objective : objectives) {
+            if (solutionA.getIntVal(objective) > solutionB.getIntVal(objective)) {
+                dominates = false;
+                break;
+            }
+        }
+        return dominates;
     }
 
     private ArrayList<String> getNewDisjunctions(int[] conjunctionTarget, int[] disjunctionsNew){
