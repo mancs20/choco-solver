@@ -54,7 +54,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
         boolean exhaustive = false;
         if (!stopCriterionReached){
             // Add the saugmecon objective
-            setSaugmeconObjective(maximize);
+            setSaugmeconObjective();
             // initialize the epsilon array, ef2 = nadir2 - 1
             int[] efArray = new int[nadirObjectiveValues.length];
             for (int i = 0; i < nadirObjectiveValues.length; i++) {
@@ -404,7 +404,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
         return solution;
     }
 
-    private void setSaugmeconObjective(boolean maximize) {
+    private void setSaugmeconObjective() {
         // check if the saugmecon objective can be calculated as in the paper. If the objectives are too big,
         // the coefficients in the objective function will exceed the int limit. In this case, there are two options:
         // 1. optimize objective 1 and at the end check if there are some solutions that do not belong to the pareto
@@ -481,7 +481,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
             IntVar[] saugmeconObjectiveArr = new IntVar[objectives.length];
             System.arraycopy(objectives, 0, saugmeconObjectiveArr, 0, objectives.length);
             model.scalar(saugmeconObjectiveArr, coefficients, "=", saugmeconObjective).post();
-            model.setObjective(maximize, saugmeconObjective);
+            model.setObjective(true, saugmeconObjective);
         }else{
             solver.getModel().getObjective().getModel().clearObjective();
             System.out.println("Lexicographic optimization is used. Saugmecon objective is bigger than Integer.MAX_VALUE");
