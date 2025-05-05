@@ -660,9 +660,6 @@ public interface IResolutionHelper extends ISelf<Solver> {
         // convert to minimization
         objectives = Stream.of(objectives).map(o -> maximize ? ref().getModel().neg(o) : o).toArray(IntVar[]::new);
 
-        if (objectives.length != 2){
-            throw new Exception("Finding the pareto front by disjunction optimzation is only implemented for 2 objectives");
-        }
         List<Solution> paretoSolutions = new ArrayList<>();
         List<String> recorderList = new ArrayList<>();
 
@@ -712,10 +709,10 @@ public interface IResolutionHelper extends ISelf<Solver> {
             }
         }
 
-        int[] currentDisjunction = new int[objectives.length];
+        int[] currentConjunction = new int[objectives.length];
         Constraint[] constraintObjectives = new Constraint[objectives.length];
         boolean keepExploring = true;
-        HashMap<String, String> disjunctions = new HashMap<>();
+        HashMap<String, String> disjunctionOfConjunctions = new HashMap<>();
 
         if (!timeoutReached) {
             // create objective function
@@ -730,15 +727,15 @@ public interface IResolutionHelper extends ISelf<Solver> {
             ref().getModel().setObjective(false, objectiveSum);
 
             for (int i = 0; i < objectives.length; i++) {
-                currentDisjunction[i] = objectives[i].getUB() + 1;
+                currentConjunction[i] = objectives[i].getUB() + 1;
             }
-            disjunctions.put(Arrays.toString(currentDisjunction), "feasible");
+            disjunctionOfConjunctions.put(Arrays.toString(currentConjunction), "feasible");
         }
 
         while (keepExploring && !timeoutReached){
             // post current disjunction constraint
             for (int i = 0; i < objectives.length; i++) {
-                constraintObjectives[i] = ref().getModel().arithm(objectives[i], "<", currentDisjunction[i]);
+                constraintObjectives[i] = ref().getModel().arithm(objectives[i], "<", currentConjunction[i]);
                 constraintObjectives[i].post();
             }
             remainingTime = updateSolverTimeoutCurrentTime(ref(), timeout, startTimeNano);
@@ -760,28 +757,28 @@ public interface IResolutionHelper extends ISelf<Solver> {
             // Get statistics
             recorderList.add(ref().getMeasures().toString());
             if (solution.exists()){
-                disjunctions.put(Arrays.toString(currentDisjunction), "explored");
+                disjunctionOfConjunctions.put(Arrays.toString(currentConjunction), "explored");
                 int[] solutionObjectives = new int[objectives.length];
                 for (int i = 0; i < objectives.length; i++) {
                     solutionObjectives[i] = solution.getIntVal(objectives[i]);
                 }
                 paretoSolutions.add(solution);
                 // get the new disjunctions
-                ArrayList<String> newDisjunctions = new ArrayList<>();
-                for (String conjunctionString: disjunctions.keySet()) {
+                ArrayList<String> newConjunctions = new ArrayList<>();
+                for (String conjunctionString: disjunctionOfConjunctions.keySet()) {
                     int[] conjunction = Arrays.stream(conjunctionString.replace("[", "").replace("]", "").split(","))
                             .map(String::trim)
                             .mapToInt(Integer::parseInt)
                             .toArray();
-                    newDisjunctions.addAll(getNewDisjunctions(conjunction, solutionObjectives));
+                    newConjunctions.addAll(getNewConjunctions(conjunction, solutionObjectives));
                 }
-                applyDominance(newDisjunctions);
-                updateDisjunctionLabels(disjunctions, newDisjunctions, b);
+                applyDominance(newConjunctions);
+                updateConjunctionLabels(disjunctionOfConjunctions, newConjunctions, b);
             }else{
-                disjunctions.put(Arrays.toString(currentDisjunction), "infeasible");
+                disjunctionOfConjunctions.put(Arrays.toString(currentConjunction), "infeasible");
             }
-            currentDisjunction = getNextDisjunction(disjunctions);
-            if (currentDisjunction == null){
+            currentConjunction = getNextConjunction(disjunctionOfConjunctions);
+            if (currentConjunction == null){
                 keepExploring = false;
             }
 
@@ -821,7 +818,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
             }
         } else {
             // remove the elements in recorderList that were found while optimizing individual objectives
-            for (int i = 0; i < paretoSolutions.size(); i++) {
+            for (int i = 0; i < solutionsB.size(); i++) {
                 recorderList.set(i, "No solution" + recorderList.get(i));
             }
         }
@@ -855,45 +852,45 @@ public interface IResolutionHelper extends ISelf<Solver> {
         return dominates;
     }
 
-    private ArrayList<String> getNewDisjunctions(int[] conjunctionTarget, int[] disjunctionsNew){
-        ArrayList<String> newDisjunctions = new ArrayList<>();
+    private ArrayList<String> getNewConjunctions(int[] conjunctionTarget, int[] disjunctionsNew){
+        ArrayList<String> newConjunctions = new ArrayList<>();
         for (int i = 0; i < conjunctionTarget.length; i++) {
             int[] tempDisjunction = new int[conjunctionTarget.length];
             System.arraycopy(conjunctionTarget,0, tempDisjunction, 0, conjunctionTarget.length);
             tempDisjunction[i] = Math.min(disjunctionsNew[i], conjunctionTarget[i]);
-            newDisjunctions.add(Arrays.toString(tempDisjunction));
+            newConjunctions.add(Arrays.toString(tempDisjunction));
         }
 
-        return newDisjunctions;
+        return newConjunctions;
     }
 
-    private void applyDominance(ArrayList<String> disjunctionsStrings){
-        ArrayList<int[]> disjunctions = new ArrayList<>();
-        for (String disjunctionString: disjunctionsStrings) {
-            int[] disjunction = Arrays.stream(disjunctionString.replace("[", "").replace("]", "").split(","))
+    private void applyDominance(ArrayList<String> conjunctionsStrings){
+        ArrayList<int[]> conjunctionsList = new ArrayList<>();
+        for (String conjunctionString: conjunctionsStrings) {
+            int[] conjunction = Arrays.stream(conjunctionString.replace("[", "").replace("]", "").split(","))
                     .map(String::trim)  // Trim any leading or trailing spaces
                     .mapToInt(Integer::parseInt)
                     .toArray();
-            disjunctions.add(disjunction);
+            conjunctionsList.add(conjunction);
         }
-        for (int i = 0; i < disjunctions.size() - 1; i++) {
-            for (int j = i+1; j < disjunctions.size(); j++) {
+        for (int i = 0; i < conjunctionsList.size() - 1; i++) {
+            for (int j = i+1; j < conjunctionsList.size(); j++) {
                 boolean iDominatesJ = true;
                 boolean jDominatesI = true;
-                for (int k = 0; k < disjunctions.get(i).length; k++) {
-                    if (disjunctions.get(i)[k] < disjunctions.get(j)[k]){
+                for (int k = 0; k < conjunctionsList.get(i).length; k++) {
+                    if (conjunctionsList.get(i)[k] < conjunctionsList.get(j)[k]){
                         iDominatesJ = false;
-                    }else if (disjunctions.get(i)[k] > disjunctions.get(j)[k]){
+                    }else if (conjunctionsList.get(i)[k] > conjunctionsList.get(j)[k]){
                         jDominatesI = false;
                     }
                 }
                 if (iDominatesJ) {
-                    disjunctions.remove(j);
-                    disjunctionsStrings.remove(j);
+                    conjunctionsList.remove(j);
+                    conjunctionsStrings.remove(j);
                     j--;
                 } else if (jDominatesI) {
-                    disjunctions.remove(i);
-                    disjunctionsStrings.remove(i);
+                    conjunctionsList.remove(i);
+                    conjunctionsStrings.remove(i);
                     i--;
                     break;
                 }
@@ -901,14 +898,14 @@ public interface IResolutionHelper extends ISelf<Solver> {
         }
     }
 
-    private void updateDisjunctionLabels(HashMap<String, String> disjunctions, ArrayList<String> newDisjunctions, int[] lowerBounds){
-        HashSet<String> newDisjunctionsMap = new HashSet<>(newDisjunctions);
-        disjunctions.keySet().removeIf(conjunctionString ->
-                !newDisjunctionsMap.contains(conjunctionString)
+    private void updateConjunctionLabels(HashMap<String, String> disjunctionOfConjunctions, ArrayList<String> newConjunctions, int[] lowerBounds){
+        HashSet<String> newConjunctionsMap = new HashSet<>(newConjunctions);
+        disjunctionOfConjunctions.keySet().removeIf(conjunctionString ->
+                !newConjunctionsMap.contains(conjunctionString)
         );
 
-        for (String newConjunction: newDisjunctions) {
-            if (!disjunctions.containsKey(newConjunction)){
+        for (String newConjunction: newConjunctions) {
+            if (!disjunctionOfConjunctions.containsKey(newConjunction)){
                 // check if any element of the conjunction is less than the lower bound
                 int[] conjunction = Arrays.stream(newConjunction.replace("[", "").replace("]", "").split(","))
                         .map(String::trim)  // Trim any leading or trailing spaces
@@ -921,24 +918,24 @@ public interface IResolutionHelper extends ISelf<Solver> {
                         break;
                     }
                 }
-                disjunctions.put(newConjunction, feasible ? "feasible": "infeasible");
+                disjunctionOfConjunctions.put(newConjunction, feasible ? "feasible": "infeasible");
             }
         }
     }
 
-    private int[] getNextDisjunction(HashMap<String, String> disjunctions){
-        int[] nextDisjunction = null;
+    private int[] getNextConjunction(HashMap<String, String> disjunctions){
+        int[] nextConjunction = null;
         for (String disjunction: disjunctions.keySet()) {
             if (disjunctions.get(disjunction).equals("feasible")){
                 String[] stringParts = disjunction.replace("[", "").replace("]", "").split(", ");
-                nextDisjunction = new int[stringParts.length];
+                nextConjunction = new int[stringParts.length];
                 for (int i = 0; i < stringParts.length; i++) {
-                    nextDisjunction[i] = Integer.parseInt(stringParts[i]);
+                    nextConjunction[i] = Integer.parseInt(stringParts[i]);
                 }
                 break;
             }
         }
-        return nextDisjunction;
+        return nextConjunction;
     }
 
     /**
