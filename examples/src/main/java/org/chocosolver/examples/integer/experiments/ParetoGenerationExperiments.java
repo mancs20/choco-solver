@@ -3,6 +3,7 @@ package org.chocosolver.examples.integer.experiments;
 import org.chocosolver.examples.integer.Pareto;
 import org.chocosolver.examples.integer.ParetoGIA;
 import org.chocosolver.examples.integer.ParetoSaugmecon;
+import org.chocosolver.examples.integer.ParetoSaugmeconNoRecursive;
 import org.chocosolver.examples.integer.experiments.benchmarkreader.ModelObjectivesVariables;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
@@ -185,9 +186,12 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 case "ParetoGavanelliGlobalConstraint":
                     ParetoGavanelliFrontEvolutionInfo paretoGavanelliFrontEvolutionInfo = new ParetoGavanelliFrontEvolutionInfo();
                     return paretoGavanelliFrontEvolutionInfo.run(model, objectives, maximize);
-                case "Saugmecon":
+                case "SaugmeconRecursive":
                     ParetoSaugmecon paretoSaugmeconLex = new ParetoSaugmecon(true);
                     return paretoSaugmeconLex.run(model, objectives, maximize, timeoutSec);
+                case "Saugmecon":
+                    ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursive = new ParetoSaugmeconNoRecursive();
+                    return paretoSaugmeconNoRecursive.run(model, objectives, maximize, true, timeoutSec);
                 case "SaugmeconFrontVerify":
                     ParetoSaugmecon paretoSaugmecon = new ParetoSaugmecon(false);
                     return paretoSaugmecon.run(model, objectives, maximize, timeoutSec);

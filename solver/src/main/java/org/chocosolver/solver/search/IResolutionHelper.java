@@ -26,6 +26,7 @@ import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
 import org.chocosolver.solver.objective.ParetoMaximizer;
 import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
+import org.chocosolver.solver.objective.SaugmeconNoRecursion;
 import org.chocosolver.solver.search.limits.ACounter;
 import org.chocosolver.solver.search.limits.SolutionCounter;
 import org.chocosolver.solver.search.measure.IMeasures;
@@ -535,6 +536,49 @@ public interface IResolutionHelper extends ISelf<Solver> {
         return pareto.getParetoFront();
     }
 
+    /**
+     * SAUGMECON method based on the paper "Zhang, W., Reimann, M.:
+     * A simple augmented ∊-constraint method for multi-objective mathematical integer programming problems.
+     * Eur. J. Oper. Res. 234, 15–24 (2014). https://doi.org/10.1016/j.ejor.2013.09.001."
+     *
+     * @param objectives the array of variables to optimize
+     * @param maximize   set to <tt>true</tt> to solve a maximization problem, set to <tt>false</tt> to solve a minimization
+     *                   problem.
+     * @param performLexicographicOptimization in case the original objective function cannot be used we have either to
+     *                                         perform lexicographic optimization or optimize just one objective. The
+     *                                         latter may generate non-Pareto optimal solutions, so it is necessary to
+     *                                         remove those solutions after the algorithm ends.
+     * @param timeout    time limit in seconds to find the Pareto front
+     * @param stop       optional criteria to stop the search before finding all/best solution
+     * @return a list that contained the solutions found.
+     */
+    default List<Solution> findParetoFrontSaugmecon(IntVar[] objectives, boolean maximize, boolean performLexicographicOptimization, int timeout, Criterion... stop) {
+        // get the objective with the highest difference between max and min
+        int argMaxDiff = 0;
+        int maxDiff = objectives[0].getUB() - objectives[0].getLB();
+        for (int i = 1; i < objectives.length; i++) {
+           if (objectives[i].getUB() - objectives[i].getLB() > maxDiff) argMaxDiff = i;
+        }
+
+        // Build permutation: keep original order, but move the max-diff index to the end
+        Collections.rotate(Arrays.asList(objectives).subList(0, argMaxDiff+1), 1);
+
+        // transform the problem to maximization
+        IntVar[] objectivesMax = Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new);
+        SaugmeconNoRecursion saugmecon = new SaugmeconNoRecursion(performLexicographicOptimization, ref().getModel(), objectivesMax, timeout);
+        saugmecon.initialization();
+        List<Solution> solutions =  saugmecon.exploreAllEpsilonValues();
+        // rotate back the solutions to the original order
+        for (Solution s : solutions) {
+            int val = s.getIntVal(objectives[0]);
+            for (int i = 0; i < argMaxDiff; i++) {
+                s.setIntVal(objectives[i], s.getIntVal(objectives[i + 1]));
+            }
+            s.setIntVal(objectives[argMaxDiff], val);
+        }
+
+        return solutions;
+    }
 
     /**
      * todo write description
