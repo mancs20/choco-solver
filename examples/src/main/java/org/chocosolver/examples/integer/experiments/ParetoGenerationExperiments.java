@@ -186,13 +186,16 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 case "ParetoGavanelliGlobalConstraint":
                     ParetoGavanelliFrontEvolutionInfo paretoGavanelliFrontEvolutionInfo = new ParetoGavanelliFrontEvolutionInfo();
                     return paretoGavanelliFrontEvolutionInfo.run(model, objectives, maximize);
-                case "SaugmeconRecursive":
-                    ParetoSaugmecon paretoSaugmeconLex = new ParetoSaugmecon(true);
-                    return paretoSaugmeconLex.run(model, objectives, maximize, timeoutSec);
                 case "Saugmecon":
                     ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursive = new ParetoSaugmeconNoRecursive();
                     return paretoSaugmeconNoRecursive.run(model, objectives, maximize, true, timeoutSec);
                 case "SaugmeconFrontVerify":
+                    ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursiveFrontVerify = new ParetoSaugmeconNoRecursive();
+                    return paretoSaugmeconNoRecursiveFrontVerify.run(model, objectives, maximize, false, timeoutSec);
+                case "SaugmeconRecursive":
+                    ParetoSaugmecon paretoSaugmeconLex = new ParetoSaugmecon(true);
+                    return paretoSaugmeconLex.run(model, objectives, maximize, timeoutSec);
+                case "SaugmeconRecursiveFrontVerify":
                     ParetoSaugmecon paretoSaugmecon = new ParetoSaugmecon(false);
                     return paretoSaugmecon.run(model, objectives, maximize, timeoutSec);
                 default:
