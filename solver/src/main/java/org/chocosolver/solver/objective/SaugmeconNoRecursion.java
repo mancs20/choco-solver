@@ -238,6 +238,7 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
                 updateEpsilonValues();
             }
         }
+        recorder.onEnd();
         if (stopCriterionReached) {
             if (efArray[efArray.length-1] <= bestObjectiveValues[bestObjectiveValues.length-1]) {
                 System.out.println("Stop criterion reached, the Pareto front may be incomplete");
