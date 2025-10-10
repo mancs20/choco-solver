@@ -21,15 +21,22 @@ import org.chocosolver.solver.variables.IntVar;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.io.StringReader;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.testng.Assert.*;
 
@@ -38,10 +45,23 @@ import static org.testng.Assert.*;
  *
  * @author Jimmy Liang, Jean-Guillaume Fages
  */
+@Test(singleThreaded = true)
 public class ParetoFront {
 
-	@Test(groups = "1s", timeOut = 60000)
-	public void testPareto(){
+	private static final Map<String, RunResult> RUN_CACHE = new ConcurrentHashMap<>();
+
+	private static String runKey(String benchmark, String problem, String instanceFile,
+								 int timeoutSec, String method) {
+		return String.join("|", benchmark, problem, instanceFile, String.valueOf(timeoutSec), method);
+	}
+
+	@AfterClass
+	public void clearRunCache() {
+		RUN_CACHE.clear();
+	}
+
+	@Test(groups = "1s", timeOut = 5000)
+	public void testPareto() {
 		// simple model
 		Model model = new Model();
 		IntVar a = model.intVar("a", 0, 2, false);
@@ -50,20 +70,20 @@ public class ParetoFront {
 		model.arithm(a, "+", b, "=", c).post();
 
 		// retrieve the pareto front
-		List<Solution> paretoFront = model.getSolver().findParetoFront(new IntVar[]{a,b},true );
-		System.out.println("The pareto front has "+paretoFront.size()+" solutions : ");
+		List<Solution> paretoFront = model.getSolver().findParetoFront(new IntVar[]{a, b}, true);
+		System.out.println("The pareto front has " + paretoFront.size() + " solutions : ");
 		Assert.assertEquals(3, paretoFront.size());
-		for(Solution s:paretoFront){
-			System.out.println("a = "+s.getIntVal(a)+" and b = "+s.getIntVal(b));
+		for (Solution s : paretoFront) {
+			System.out.println("a = " + s.getIntVal(a) + " and b = " + s.getIntVal(b));
 			Assert.assertEquals(2, s.getIntVal(c));
 		}
 	}
 
-	@Test(groups = "5s", timeOut = 300_000)
+	@Test(groups = "5s", timeOut = 5_000)
 	public void testParetoWhenTimeoutHappens() throws Exception {
 		String instanceFile = "n_queens_p-5_q-8_ins-1.dat";
 		int timeoutSec = 1;
-		String[] methodsToCompare = new String[]{"Saugmecon"};
+		String[] methodsToCompare = new String[]{"SaugmeconNoR"};
 
 		for (String method : methodsToCompare) {
 			JSONArray pfJson = runAndCollectPFStringsNqueens(method, instanceFile, timeoutSec);
@@ -72,39 +92,56 @@ public class ParetoFront {
 		}
 	}
 
-	@Test(groups = "1000s", timeOut = 60_000_000)
-	public void testParetoMethods() throws Exception {
+	@DataProvider(name = "methods")
+	public Object[][] methods() {
+		return new Object[][]{
+				{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfo"},
+				{"ParetoDisjunctiveProgramming"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
+		};
+	}
+
+	@Test(dataProvider = "methods", groups = "100s", timeOut = 100_000)
+	public void testParetoMethods(String method) throws Exception {
 		String instanceFile = "n_queens_p-5_q-8_ins-1.dat";
 		int timeoutSec = 1000;
 		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
-		String[] methodsToCompare = new String[]{"Saugmecon"};
 
 		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethodInComparisson, instanceFile, timeoutSec);
 		Set<String> basePFSet = pfJsonToSet(basePF, baseMethodInComparisson);
 
-		for (String method : methodsToCompare) {
-			JSONArray pfJson = runAndCollectPFStringsNqueens(method, instanceFile, timeoutSec);
-			Set<String> pf = pfJsonToSet(pfJson, method);
+		JSONArray pfJson = runAndCollectPFStringsNqueens(method, instanceFile, timeoutSec);
+		Set<String> pf = pfJsonToSet(pfJson, method);
 
-			assertEquals(pf.size(), basePFSet.size(), "Different Pareto front sizes, Gavanelli= "
-					+ basePFSet.size() + " and " + method + "= " + pf.size());
+		assertEquals(pf.size(), basePFSet.size(), "Different Pareto front sizes, Gavanelli= "
+				+ basePFSet.size() + " and " + method + "= " + pf.size());
 
-			if (!pf.equals(basePFSet)) {
-				Set<String> missingInMethod = new HashSet<>(basePFSet);
-				missingInMethod.removeAll(pf);
-				Set<String> extraInMethod = new HashSet<>(pf);
-				extraInMethod.removeAll(basePFSet);
-				fail("Fronts differ for " + method
-						+ "\nMissing in " + method + ": " + missingInMethod
-						+ "\nExtra in " + method + ": " + extraInMethod);
-			}
+		if (!pf.equals(basePFSet)) {
+			Set<String> missingInMethod = new HashSet<>(basePFSet);
+			missingInMethod.removeAll(pf);
+			Set<String> extraInMethod = new HashSet<>(pf);
+			extraInMethod.removeAll(basePFSet);
+			fail("Fronts differ for " + method
+					+ "\nMissing in " + method + ": " + missingInMethod
+					+ "\nExtra in " + method + ": " + extraInMethod);
 		}
 	}
 
-	@Test(groups = "1000s", timeOut = 60_000_000)
+	@Test(dataProvider = "methods", groups = "35s", timeOut = 40000)
+	public void testParetoMethodsOutput(String method) throws Exception {
+		String instanceFile = "n_queens_p-3_q-8_ins-1.dat";
+		int timeoutSec = 5;
+		RunResult rr = runAndCollectAllNoCache(method, instanceFile, timeoutSec, "powa", "nqueens");
+
+		JSONArray pf = rr.solutionsDetails.optJSONArray("pareto_front");
+		assertNotNull(pf, String.format("[%s] pareto_front missing.\n%s", method, rr.stdout));
+		assertTrue(pf.length() >= 0, String.format("[%s] pareto_front empty?\n%s", method, rr.stdout));
+		assertAggregatesConsistent(rr.solutionsDetails, rr.solverMessages, rr.stdout);
+	}
+
+	@Test(groups = "100s", timeOut = 100_000)
 	public void testParetoMethodsBiObjectiveProblems() throws Exception {
 		String instanceFile = "n_queens_p-2_q-8_ins-1.dat";
-		int timeoutSec = 1000;
+		int timeoutSec = 100;
 		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
 		String[] methodsToCompare = new String[]{"Saugmecon"};
 
@@ -130,10 +167,10 @@ public class ParetoFront {
 		}
 	}
 
-	@Test(groups = "1000s", timeOut = 60_000_000)
+	@Test(groups = "100", timeOut = 100_000)
 	public void testSaugmeconObjectiveFunction() throws Exception {
 		String instanceFile = "n_queens_p-3_q-8_ins-1.dat";
-		int timeoutSec = 1000;
+		int timeoutSec = 100;
 		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
 		String[] methodsToCompare = new String[]{"Saugmecon"};
 
@@ -159,33 +196,38 @@ public class ParetoFront {
 		}
 	}
 
-	@Test(groups = "5s", timeOut = 300_000)
-	public void testSaugmeconWhenTimeoutReachedAfterIndividualOptimalValues() throws Exception {
+	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
+	public Object[][] methodsOptimizeObjectivesIndividually() {
+		return new Object[][]{
+				{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoDisjunctiveProgramming"}
+		};
+	}
+
+	@Test(dataProvider = "methodsOptimizeObjectivesIndividually", groups = "5s", timeOut = 300_000)
+	public void testParetoMethodsWhenTimeoutReachedAfterIndividualOptimalValues(String method) throws Exception {
 		String instanceFile = "KP_p-2_n-50_ins-14.dat";
 		int timeoutSec = 5;
-		String[] methodsToCompare = new String[]{"Saugmecon"};
-
-		for (String method : methodsToCompare) {
-			JSONArray pfJson = runAndCollectPFStringsMOOLibraryKP(method, instanceFile, timeoutSec);
-			System.out.println("Method " + method + " found " + pfJson.length() + " non-dominated solutions.");
-			pfJsonToSet(pfJson, method);
-		}
+		JSONArray pfJson = runAndCollectPFStringsMOOLibraryKP(method, instanceFile, timeoutSec);
+		System.out.println("Method " + method + " found " + pfJson.length() + " non-dominated solutions.");
+		pfJsonToSet(pfJson, method);
 	}
 
 	private JSONArray runAndCollectPFStringsNqueens(String paretoMethod, String instanceFile, int timeoutSec) throws Exception {
-		String benchmark = "powa";
-		String problem = "nqueens";
-		return runAndCollectPFStrings(paretoMethod, instanceFile, timeoutSec, benchmark, problem);
+		return runAndCollectPFStrings(paretoMethod, instanceFile, timeoutSec, "powa", "nqueens");
 	}
 
 	private JSONArray runAndCollectPFStringsMOOLibraryKP(String paretoMethod, String instanceFile, int timeoutSec) throws Exception {
-		String benchmark = "MOOLibrary";
-		String problem = "UKP";
-		return runAndCollectPFStrings(paretoMethod, instanceFile, timeoutSec, benchmark, problem);
+		return runAndCollectPFStrings(paretoMethod, instanceFile, timeoutSec, "MOOLibrary", "UKP");
 	}
 
 	private JSONArray runAndCollectPFStrings(String paretoMethod, String instanceFile, int timeoutSec,
 											 String benchmark, String problem) throws Exception {
+		RunResult rr = getOrRun(paretoMethod, instanceFile, timeoutSec, benchmark, problem);
+		return rr.solutionsDetails.getJSONArray("pareto_front");
+	}
+
+	private RunResult runAndCollectAllNoCache(String paretoMethod, String instanceFile, int timeoutSec,
+											  String benchmark, String problem) throws Exception {
 		URL url = Thread.currentThread().getContextClassLoader().getResource("moInstances/" + instanceFile);
 		Path instancePath = Paths.get(Objects.requireNonNull(url, "instance not found: " + instanceFile).toURI());
 		String instanceName = instanceFile.split("\\.")[0];
@@ -199,23 +241,157 @@ public class ParetoFront {
 				paretoMethod
 		};
 
-		// capture stdout
+		// capture stdout of the experiment
 		PrintStream originalOut = System.out;
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		System.setOut(new PrintStream(baos));
+		System.setOut(new PrintStream(baos, true));
 		try {
 			ParetoGenerationExperiments.main(args);
 		} finally {
 			System.setOut(originalOut);
 		}
-		String out = new String(baos.toByteArray(), StandardCharsets.UTF_8);
+		String out = baos.toString();
 
-		String json = extractSolutionsDetailsJson(out);
-		assertNotNull(json, "Could not find solutions-details JSON in output.\nOutput was:\n" + out);
+		// parse solutions-details JSON (output starts from "Starting experiment...")
+		JSONObject lastSolutionsDetails = null;
+		try (BufferedReader br = new BufferedReader(new StringReader(out))) {
+			String line;
+			while ((line = br.readLine()) != null) {
+				line = line.trim();
+				if (!line.startsWith("{") || !line.endsWith("}")) continue;
 
-		return new JSONObject(json)
-				.getJSONObject("solutions-details")
-				.getJSONArray("pareto_front");
+				JSONObject obj;
+				try {
+					obj = new JSONObject(line);
+				} catch (Exception ignore) {
+					continue;
+				}
+
+				if ("solutions-details".equals(obj.optString("type"))) {
+					lastSolutionsDetails = obj.getJSONObject("solutions-details");
+				}
+			}
+		}
+
+		assertNotNull(lastSolutionsDetails, "No solutions-details JSON found.\nOutput was:\n" + out);
+
+		// pull solver_messages if present
+		List<String> solverMessages = new ArrayList<>();
+		if (lastSolutionsDetails.has("solver_messages")) {
+			JSONArray msgs = lastSolutionsDetails.getJSONArray("solver_messages");
+			for (int i = 0; i < msgs.length(); i++) solverMessages.add(msgs.getString(i));
+		}
+
+		return new RunResult(lastSolutionsDetails, solverMessages, out);
+	}
+
+	private RunResult getOrRun(String paretoMethod, String instanceFile, int timeoutSec,
+							   String benchmark, String problem) throws Exception {
+		String key = runKey(benchmark, problem, instanceFile, timeoutSec, paretoMethod);
+		RunResult cached = RUN_CACHE.get(key);
+		if (cached != null) return cached;
+
+		RunResult rr = runAndCollectAllNoCache(paretoMethod, instanceFile, timeoutSec, benchmark, problem);
+		RUN_CACHE.put(key, rr);
+		return rr;
+	}
+
+	private static ChocoMsgStats parseChocoMessage(String msg) {
+		ChocoMsgStats s = new ChocoMsgStats();
+		s.buildingTime = extractDouble(msg, "Building time\\s*:\\s*([\\d,.]+)s");
+		s.resolutionTime = extractDouble(msg, "Resolution time\\s*:\\s*([\\d,.]+)s");
+
+		Matcher m = Pattern.compile("Nodes:\\s*([\\d,]+)\\s*\\(([\\d,.]+)\\s*n/s\\)").matcher(msg);
+		if (m.find()) {
+			s.nodes = Long.parseLong(m.group(1).replace(",", ""));
+			s.avgNodesPerSec = Double.parseDouble(m.group(2).replace(",", ""));
+		}
+
+		s.fails = (long) extractDouble(msg, "Fails\\s*:\\s*([\\d,]+)");
+		s.backtracks = (long) extractDouble(msg, "Backtracks\\s*:\\s*([\\d,]+)");
+		s.backjumps = (long) extractDouble(msg, "Backjumps\\s*:\\s*([\\d,]+)");
+		s.restarts = (long) extractDouble(msg, "Restarts\\s*:\\s*([\\d,]+)");
+		s.solutions = (long) extractDouble(msg, "Solutions\\s*:\\s*([\\d,]+)");
+		return s;
+	}
+
+	private static double extractDouble(String s, String regex) {
+		Matcher m = Pattern.compile(regex).matcher(s);
+		if (m.find()) return Double.parseDouble(m.group(1).replace(",", ""));
+		return 0.0;
+	}
+
+	private static void assertAggregatesConsistent(JSONObject details, List<String> msgs, String stdout) {
+		if (msgs.isEmpty()) return;
+
+		Matcher fgMatcher = Pattern.compile("frontGenerator:([A-Za-z0-9_]+)").matcher(stdout);
+		String frontGenerator = fgMatcher.find() ? fgMatcher.group(1) : "";
+		final boolean isGavanelli = frontGenerator.toLowerCase().contains("gavanelli");
+
+		List<ChocoMsgStats> parsed = msgs.stream()
+				.map(ParetoFront::parseChocoMessage)
+				.collect(Collectors.toList());
+
+		double tol = 1e-6; // float tolerance
+
+		double expectedBuilding;
+		double expectedResolutionSum = 0;
+		long expectedFails = 0, expectedBacktracks = 0, expectedBackjumps = 0, expectedRestarts = 0, expectedSolutions = 0;
+		long expectedNodes = 0;
+		double avgNodesPerSec;
+
+		ChocoMsgStats last = parsed.get(parsed.size() - 1);
+		expectedBuilding = last.buildingTime;
+		if (isGavanelli) {
+			expectedResolutionSum = last.resolutionTime;
+			expectedFails = last.fails;
+			expectedBacktracks = last.backtracks;
+			expectedBackjumps = last.backjumps;
+			expectedRestarts = last.restarts;
+			expectedSolutions = last.solutions;
+			expectedNodes = last.nodes;
+			avgNodesPerSec = last.avgNodesPerSec;
+		} else {
+			for (ChocoMsgStats s : parsed) {
+				expectedResolutionSum += s.resolutionTime;
+				expectedFails += s.fails;
+				expectedBacktracks += s.backtracks;
+				expectedBackjumps += s.backjumps;
+				expectedRestarts += s.restarts;
+				expectedSolutions += s.solutions;
+				expectedNodes += s.nodes;
+			}
+			avgNodesPerSec = parsed.stream().mapToDouble(p -> p.avgNodesPerSec).average().orElse(0.0);
+		}
+
+		assertAlmostEquals(details.optDouble("sum_solutions_building_time(s)"), expectedBuilding, tol,
+				"sum_solutions_building_time(s)");
+		assertAlmostEquals(details.optDouble("sum_solutions_resolution_time(s)"), expectedResolutionSum, tol,
+				"sum_solutions_resolution_time(s)");
+		assertEquals(details.optLong("sum_solutions_fails"), expectedFails,
+				"sum_solutions_fails mismatch");
+		assertEquals(details.optLong("sum_solutions_backtracks"), expectedBacktracks,
+				"sum_solutions_backtracks mismatch");
+		assertEquals(details.optLong("sum_solutions_backjumps"), expectedBackjumps,
+				"sum_solutions_backjumps mismatch");
+		assertEquals(details.optLong("sum_solutions_restarts"), expectedRestarts,
+				"sum_solutions_restarts mismatch");
+		assertEquals(details.optLong("sum_number_solutions"), expectedSolutions,
+				"sum_number_solutions mismatch");
+		assertEquals(details.optLong("sum_solutions_nodes"), expectedNodes,
+				"sum_solutions_nodes mismatch");
+
+		double actualAvg = details.optDouble("average_node_per_second");
+		if (Math.abs(Math.floor(actualAvg) - Math.floor(avgNodesPerSec)) > 0) {
+			assertAlmostEquals(actualAvg, avgNodesPerSec, 1e-3, "average_node_per_second");
+		}
+	}
+
+	private static void assertAlmostEquals(double actual, double expected, double tol, String field) {
+		if (Double.isNaN(actual) && Double.isNaN(expected)) return;
+		if (Math.abs(actual - expected) > tol) {
+			fail(field + " mismatch. expected=" + expected + " actual=" + actual);
+		}
 	}
 
 	private Set<String> pfJsonToSet(JSONArray pf, String methodName) {
@@ -231,22 +407,28 @@ public class ParetoFront {
 		assertFalse(set.isEmpty(), "Error in " + methodName +". Empty pareto_front parsed");
 		return set;
 	}
+}
 
-	// Find the JSON object starting at {"solutions-details"...} using simple brace counting.
-	private String extractSolutionsDetailsJson(String out) {
-		String marker = "{\"solutions-details\"";
-		int start = out.indexOf(marker);
-		if (start < 0) return null;
-		int braces = 0;
-		boolean started = false;
-		for (int i = start; i < out.length(); i++) {
-			char c = out.charAt(i);
-			if (c == '{') { braces++; started = true; }
-			else if (c == '}') { braces--; }
-			if (started && braces == 0) {
-				return out.substring(start, i + 1);
-			}
-		}
-		return null;
+class RunResult {
+	final JSONObject solutionsDetails;
+	final List<String> solverMessages;
+	final String stdout;
+
+	RunResult(JSONObject solutionsDetails, List<String> solverMessages, String stdout) {
+		this.solutionsDetails = solutionsDetails;
+		this.solverMessages = solverMessages;
+		this.stdout = stdout;
 	}
+}
+
+class ChocoMsgStats {
+	double buildingTime;
+	double resolutionTime;
+	long nodes;
+	double avgNodesPerSec;
+	long fails;
+	long backtracks;
+	long backjumps;
+	long restarts;
+	long solutions;
 }

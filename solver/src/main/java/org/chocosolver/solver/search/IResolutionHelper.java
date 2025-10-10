@@ -552,16 +552,18 @@ public interface IResolutionHelper extends ISelf<Solver> {
      * @param stop       optional criteria to stop the search before finding all/best solution
      * @return a list that contained the solutions found.
      */
-    default List<Solution> findParetoFrontSaugmecon(IntVar[] objectives, boolean maximize, boolean performLexicographicOptimization, int timeout, Criterion... stop) {
+    default SaugmeconNoRecursion findParetoFrontSaugmecon(IntVar[] objectives, boolean maximize, boolean performLexicographicOptimization, int timeout, Criterion... stop) {
+        // todo the commented code is to choose which objective to optimize based on its range, now the objective
+        //  to be optimized is the one at index 0
         // get the objective with the highest difference between max and min
-        int argMaxDiff = 0;
-        int maxDiff = objectives[0].getUB() - objectives[0].getLB();
-        for (int i = 1; i < objectives.length; i++) {
-           if (objectives[i].getUB() - objectives[i].getLB() > maxDiff) argMaxDiff = i;
-        }
+//        int argMaxDiff = 0;
+//        int maxDiff = objectives[0].getUB() - objectives[0].getLB();
+//        for (int i = 1; i < objectives.length; i++) {
+//           if (objectives[i].getUB() - objectives[i].getLB() > maxDiff) argMaxDiff = i;
+//        }
 
         // Build permutation: keep original order, but move the max-diff index to the end
-        Collections.rotate(Arrays.asList(objectives).subList(0, argMaxDiff+1), 1);
+//        Collections.rotate(Arrays.asList(objectives).subList(0, argMaxDiff+1), 1);
 
         // transform the problem to maximization
         IntVar[] objectivesMax = Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new);
@@ -569,15 +571,16 @@ public interface IResolutionHelper extends ISelf<Solver> {
         saugmecon.initialization();
         List<Solution> solutions =  saugmecon.exploreAllEpsilonValues();
         // rotate back the solutions to the original order
-        for (Solution s : solutions) {
-            int val = s.getIntVal(objectives[0]);
-            for (int i = 0; i < argMaxDiff; i++) {
-                s.setIntVal(objectives[i], s.getIntVal(objectives[i + 1]));
-            }
-            s.setIntVal(objectives[argMaxDiff], val);
-        }
+//        for (Solution s : solutions) {
+//            int val = s.getIntVal(objectives[0]);
+//            for (int i = 0; i < argMaxDiff; i++) {
+//                s.setIntVal(objectives[i], s.getIntVal(objectives[i + 1]));
+//            }
+//            s.setIntVal(objectives[argMaxDiff], val);
+//        }
+//        saugmecon.setSolutions(solutions);
 
-        return solutions;
+        return saugmecon;
     }
 
     /**

@@ -9,6 +9,7 @@
  */
 package org.chocosolver.solver.objective;
 
+import org.chocosolver.solver.Model;
 import org.chocosolver.solver.ResolutionPolicy;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
@@ -218,10 +219,11 @@ class GIAManager implements IObjectiveManager<Variable> {
     private static final long serialVersionUID = 2115489336443115889L;
     private static GIAManager INSTANCE = null; // Lazy initialization
 
+    private final Model ownerModel;                    // track which Model we’re bound to
     /**
      * The variable to optimize
      **/
-    transient protected final IntVar[] objectives;
+    transient protected IntVar[] objectives;
 
     /**
      * define the precision to consider a variable as instantiated
@@ -256,6 +258,7 @@ class GIAManager implements IObjectiveManager<Variable> {
     transient protected IntUnaryOperator cutComputer = n -> n; // walking cut by default
 
     private GIAManager(IntVar[] objectives, boolean tightUpperBound) {
+        this.ownerModel = objectives.length > 0 ? objectives[0].getModel() : null;
         this.objectives = objectives;
         this.bestProvedLB = new int[objectives.length];  // Initialize best bounds
         this.bestProvedUB = new int[objectives.length];
@@ -274,7 +277,8 @@ class GIAManager implements IObjectiveManager<Variable> {
      * Get the singleton instance. Throws an exception if not initialized.
      */
     public static GIAManager getInstance(IntVar[] objectives, boolean tightUpperBound) {
-        if (INSTANCE == null) {
+        Model m = objectives.length > 0 ? objectives[0].getModel() : null;
+        if (INSTANCE == null || INSTANCE.ownerModel != m) {
             INSTANCE = new GIAManager(objectives, tightUpperBound);
         } else {
             System.arraycopy(INSTANCE.initialLB, 0, INSTANCE.bestProvedLB, 0, INSTANCE.objectives.length);
@@ -323,6 +327,11 @@ class GIAManager implements IObjectiveManager<Variable> {
 
     @Override
     public boolean updateBestSolution() {
+        // Guard against accidental cross-model reuse
+        if (objectives.length > 0 && objectives[0].getModel() != ownerModel) {
+            throw new SolverException("GIAManager bound to a different Model. "
+                    + "This indicates stale singleton state; ensure per-Model binding.");
+        }
         boolean improved = true;
         for (int i = 0; i < objectives.length; i++) {
             if (!objectives[i].isInstantiated()) {
@@ -338,10 +347,10 @@ class GIAManager implements IObjectiveManager<Variable> {
             for (int i = 0; i < objectives.length; i++) {
                 bestProvedLB[i] = objectives[i].getValue();
             }
-        }
-        if (tightUpperBound && improved) {
-            if (addNewPointToParetoFront()) {
-                updataUpperBounds();
+            if (tightUpperBound ) {
+                if (addNewPointToParetoFront()) {
+                    updataUpperBounds();
+                }
             }
         }
         return improved;

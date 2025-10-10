@@ -24,7 +24,8 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
     private final Solver solver;
     private final Model model;
     private final IntVar[] objectives;
-    private final List<Solution> solutions = new ArrayList<>();
+    private List<Solution> solutions = new ArrayList<>();
+    private List<Solution> allSolutions = new ArrayList<>();
     private final List<String> recorderList = new ArrayList<>();
     private boolean stopCriterionReached;
     private final boolean performLexicographicOptimization;
@@ -35,6 +36,7 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
     private int[] rwv;
     private Set<String> previousSolutions;
     private List<SolutionEfArrayInformation> previousSolutionInformation;
+    private boolean exhaustive;
 
     public SaugmeconNoRecursion(boolean performLexicographicOptimization, Model model, IntVar[] objectives, int timeout){
         this.performLexicographicOptimization = performLexicographicOptimization;
@@ -47,6 +49,7 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
         // transform the problem to maximization
         this.objectives = objectives;
         constraintObjectives = new Constraint[objectives.length - 1];
+        exhaustive = true;
     }
 
     public void initialization() {
@@ -239,11 +242,18 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
             }
         }
         recorder.onEnd();
+        allSolutions = new ArrayList<>(solutions);
         if (stopCriterionReached) {
             if (efArray[efArray.length-1] <= bestObjectiveValues[bestObjectiveValues.length-1]) {
+                exhaustive = false;
                 System.out.println("Stop criterion reached, the Pareto front may be incomplete");
                 addBestObjetiveValuesAsSolutionIfNotDomanited();
                 removeLastSolutionIfDominated();
+            }
+        }
+        for (int i = 0; i < bestObjectiveValues.length; i++) {
+            if (bestObjectiveValuesSolution[i] != null) {
+                allSolutions.add(i, bestObjectiveValuesSolution[i]);
             }
         }
         return solutions;
@@ -469,6 +479,26 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
             result = lcm(result, numbers[i]);
         }
         return result;
+    }
+
+    public List<Solution> getSolutions() {
+        return solutions;
+    }
+
+    public void setSolutions(List<Solution> solutions) {
+        this.solutions = solutions;
+    }
+
+    public List<String> getRecorderList() {
+        return recorderList;
+    }
+
+    public List<Solution> getAllSolutions() {
+        return allSolutions;
+    }
+
+    public boolean isExhaustive() {
+        return exhaustive;
     }
 }
 
