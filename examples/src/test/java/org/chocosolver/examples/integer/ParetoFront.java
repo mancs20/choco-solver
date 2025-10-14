@@ -101,28 +101,61 @@ public class ParetoFront {
 	}
 
 	@Test(dataProvider = "methods", groups = "100s", timeOut = 100_000)
+	public void testParetoMethodsForKnapsack(String method) throws Exception {
+		String[] ukpInstanceFiles = new String[] {
+				"KP_p-5_n-10_ins-10.dat"
+				,"KP_p-5_n-10_ins-4.dat"
+				,"KP_p-5_n-10_ins-5.dat"
+				,"KP_p-5_n-10_ins-6.dat"
+				,"KP_p-5_n-10_ins-8.dat"
+				,"KP_p-5_n-10_ins-9.dat"
+				,"KP_p-5_n-20_ins-2.dat"
+				,"KP_p-5_n-20_ins-7.dat"
+		};
+		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
+		int timeoutSec = 100;
+		for (String instance: ukpInstanceFiles) {
+			compareMethodsWithKnapsack(baseMethodInComparisson, method, instance, timeoutSec);
+		}
+	}
+
+	@Test(dataProvider = "methods", groups = "100s", timeOut = 100_000)
 	public void testParetoMethods(String method) throws Exception {
 		String instanceFile = "n_queens_p-5_q-8_ins-1.dat";
-		int timeoutSec = 1000;
+		int timeoutSec = 100;
 		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
+		compareMethodsWithNqueen(baseMethodInComparisson, method, instanceFile, timeoutSec);
+	}
 
-		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethodInComparisson, instanceFile, timeoutSec);
-		Set<String> basePFSet = pfJsonToSet(basePF, baseMethodInComparisson);
+	private void compareMethodsWithNqueen(String baseMethod, String methodToTest, String instanceFile, int timeoutSec) throws Exception {
+		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethod, instanceFile, timeoutSec);
+		JSONArray toTestPF = runAndCollectPFStringsNqueens(methodToTest, instanceFile, timeoutSec);
 
-		JSONArray pfJson = runAndCollectPFStringsNqueens(method, instanceFile, timeoutSec);
-		Set<String> pf = pfJsonToSet(pfJson, method);
+		compareParetoFrontJson(basePF, toTestPF, baseMethod, methodToTest);
+	}
 
-		assertEquals(pf.size(), basePFSet.size(), "Different Pareto front sizes, Gavanelli= "
-				+ basePFSet.size() + " and " + method + "= " + pf.size());
+	private void compareMethodsWithKnapsack(String baseMethod, String methodToTest, String instanceFile, int timeoutSec) throws Exception {
+		JSONArray basePF = runAndCollectPFStringsMOOLibraryKP(baseMethod, instanceFile, timeoutSec);
+		JSONArray toTestPF = runAndCollectPFStringsMOOLibraryKP(methodToTest, instanceFile, timeoutSec);
 
-		if (!pf.equals(basePFSet)) {
+		compareParetoFrontJson(basePF, toTestPF, baseMethod, methodToTest);
+	}
+
+	private void compareParetoFrontJson(JSONArray basePF, JSONArray toTestPF, String baseMethod, String methodToTest) {
+		Set<String> basePFSet = pfJsonToSet(basePF, baseMethod);
+		Set<String> toTestPFSet = pfJsonToSet(toTestPF, methodToTest);
+
+		assertEquals(toTestPFSet.size(), basePFSet.size(), "Different Pareto front sizes, Gavanelli= "
+				+ basePFSet.size() + " and " + methodToTest + "= " + toTestPFSet.size());
+
+		if (!toTestPFSet.equals(basePFSet)) {
 			Set<String> missingInMethod = new HashSet<>(basePFSet);
-			missingInMethod.removeAll(pf);
-			Set<String> extraInMethod = new HashSet<>(pf);
+			missingInMethod.removeAll(toTestPFSet);
+			Set<String> extraInMethod = new HashSet<>(toTestPFSet);
 			extraInMethod.removeAll(basePFSet);
-			fail("Fronts differ for " + method
-					+ "\nMissing in " + method + ": " + missingInMethod
-					+ "\nExtra in " + method + ": " + extraInMethod);
+			fail("Fronts differ for " + methodToTest
+					+ "\nMissing in " + methodToTest + ": " + missingInMethod
+					+ "\nExtra in " + methodToTest + ": " + extraInMethod);
 		}
 	}
 

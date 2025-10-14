@@ -139,6 +139,8 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
                 }
                 if (!solver.isStopCriterionMet()){
                     solver.reset();
+                    solveCallsCount++;
+                    solver.getMeasures().setRestartCount(solveCallsCount);
                 }else {
                     stopCriterionReached = true;
                 }
