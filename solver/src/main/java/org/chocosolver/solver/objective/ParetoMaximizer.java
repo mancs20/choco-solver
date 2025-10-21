@@ -19,6 +19,7 @@ import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.ESat;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -197,6 +198,9 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
      * @return an int representing the fact that a dominates b
      */
     private int dominates(int[] a, int[] b, int i) {
+        if (Arrays.equals(a, b)) {
+            return 2;
+        }
         int dominates = 0;
         for (int j = 0; j < objectives.length; j++) {
             if (a[j] < b[j]) return 0;

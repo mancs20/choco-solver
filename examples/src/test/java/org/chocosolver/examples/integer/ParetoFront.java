@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -79,23 +80,27 @@ public class ParetoFront {
 		}
 	}
 
-	@Test(groups = "5s", timeOut = 5_000)
-	public void testParetoWhenTimeoutHappens() throws Exception {
-		String instanceFile = "n_queens_p-5_q-8_ins-1.dat";
-		int timeoutSec = 1;
-		String[] methodsToCompare = new String[]{"SaugmeconNoR"};
+	@Test(dataProvider = "methods", groups = "10s", timeOut = 10000_000)
+	public void testParetoWhenTimeoutHappens(String method) throws Exception {
+		String instanceFile = "n_queens_p-2_q-14_ins-4.dat";
+		int timeoutSec = 2;
+		long t0 = System.nanoTime();
+		JSONArray pfJson = runAndCollectPFStringsNqueens(method, instanceFile, timeoutSec);
+		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+		System.out.println("Method " + method + " found " + pfJson.length() + " non-dominated solutions in "
+				+ elapsedMs + " ms.");
 
-		for (String method : methodsToCompare) {
-			JSONArray pfJson = runAndCollectPFStringsNqueens(method, instanceFile, timeoutSec);
-			System.out.println("Method " + method + " found " + pfJson.length() + " non-dominated solutions.");
-			pfJsonToSet(pfJson, method);
-		}
+		long upperBoundMs = timeoutSec * 1000 + 500;
+		assertTrue(elapsedMs <= upperBoundMs,
+				"Expected <= " + upperBoundMs + " ms, got " + elapsedMs + " ms");
+
+		pfJsonToSet(pfJson, method);
 	}
 
 	@DataProvider(name = "methods")
 	public Object[][] methods() {
 		return new Object[][]{
-				{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfo"},
+				{"SimpleOptGlobalConstraint"},{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfo"},
 				{"ParetoDisjunctiveProgramming"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
 		};
 	}
@@ -122,14 +127,14 @@ public class ParetoFront {
 	@Test(dataProvider = "methods", groups = "100s", timeOut = 100_000)
 	public void testParetoMethods(String method) throws Exception {
 		String instanceFile = "n_queens_p-5_q-8_ins-1.dat";
-		int timeoutSec = 100;
+		int timeoutSec = 10;
 		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
 		compareMethodsWithNqueen(baseMethodInComparisson, method, instanceFile, timeoutSec);
 	}
 
 	private void compareMethodsWithNqueen(String baseMethod, String methodToTest, String instanceFile, int timeoutSec) throws Exception {
-		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethod, instanceFile, timeoutSec);
 		JSONArray toTestPF = runAndCollectPFStringsNqueens(methodToTest, instanceFile, timeoutSec);
+		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethod, instanceFile, timeoutSec);
 
 		compareParetoFrontJson(basePF, toTestPF, baseMethod, methodToTest);
 	}

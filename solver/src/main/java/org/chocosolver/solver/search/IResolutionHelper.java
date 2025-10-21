@@ -26,6 +26,7 @@ import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
 import org.chocosolver.solver.objective.ParetoMaximizer;
 import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
+import org.chocosolver.solver.objective.ParetoOptGavanelliConstraint;
 import org.chocosolver.solver.objective.SaugmeconNoRecursion;
 import org.chocosolver.solver.search.limits.ACounter;
 import org.chocosolver.solver.search.limits.SolutionCounter;
@@ -504,6 +505,13 @@ public interface IResolutionHelper extends ISelf<Solver> {
         ref().removeStopCriterion(stop);
         ref().getModel().unpost(c);
         return pareto.getParetoFront();
+    }
+
+    // todo description
+    default ParetoOptGavanelliConstraint findParetoFrontOptimizing(IntVar[] objectives, boolean maximize, int timeout, Criterion... stop) {
+        ParetoOptGavanelliConstraint pareto = new ParetoOptGavanelliConstraint(ref().getModel(), objectives, maximize, timeout);
+        pareto.findFront();
+        return pareto;
     }
 
     default List<Solution> findParetoFrontWithFrontEvolutionInfo(IntVar[] objectives, boolean maximize, Criterion... stop) {

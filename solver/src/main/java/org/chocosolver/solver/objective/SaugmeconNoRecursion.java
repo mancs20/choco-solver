@@ -12,7 +12,7 @@ import java.math.BigInteger;
 import java.util.*;
 
 
-public class SaugmeconNoRecursion implements TimeoutHolder {
+public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolder {
 
 
     private final Constraint[] constraintObjectives;
@@ -24,9 +24,6 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
     private final Solver solver;
     private final Model model;
     private final IntVar[] objectives;
-    private List<Solution> solutions = new ArrayList<>();
-    private List<Solution> allSolutions = new ArrayList<>();
-    private final List<String> recorderList = new ArrayList<>();
     private boolean stopCriterionReached;
     private final boolean performLexicographicOptimization;
     private boolean cannotUseSaugmeconObjective;
@@ -36,7 +33,6 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
     private int[] rwv;
     private Set<String> previousSolutions;
     private List<SolutionEfArrayInformation> previousSolutionInformation;
-    private boolean exhaustive;
 
     public SaugmeconNoRecursion(boolean performLexicographicOptimization, Model model, IntVar[] objectives, int timeout){
         this.performLexicographicOptimization = performLexicographicOptimization;
@@ -481,26 +477,6 @@ public class SaugmeconNoRecursion implements TimeoutHolder {
             result = lcm(result, numbers[i]);
         }
         return result;
-    }
-
-    public List<Solution> getSolutions() {
-        return solutions;
-    }
-
-    public void setSolutions(List<Solution> solutions) {
-        this.solutions = solutions;
-    }
-
-    public List<String> getRecorderList() {
-        return recorderList;
-    }
-
-    public List<Solution> getAllSolutions() {
-        return allSolutions;
-    }
-
-    public boolean isExhaustive() {
-        return exhaustive;
     }
 }
 

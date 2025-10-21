@@ -1,9 +1,6 @@
 package org.chocosolver.examples.integer.experiments;
 
-import org.chocosolver.examples.integer.Pareto;
-import org.chocosolver.examples.integer.ParetoGIA;
-import org.chocosolver.examples.integer.ParetoSaugmecon;
-import org.chocosolver.examples.integer.ParetoSaugmeconNoRecursive;
+import org.chocosolver.examples.integer.*;
 import org.chocosolver.examples.integer.experiments.benchmarkreader.ModelObjectivesVariables;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
@@ -198,6 +195,9 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 case "SaugmeconFrontVerify":
                     ParetoSaugmecon paretoSaugmecon = new ParetoSaugmecon(false);
                     return paretoSaugmecon.run(model, objectives, maximize, timeoutSec);
+                case "SimpleOptGlobalConstraint":
+                    ParetoOptimizeSumGavanelliConstraint paretoOptimizeSumGavanelliConstraint = new ParetoOptimizeSumGavanelliConstraint();
+                    return paretoOptimizeSumGavanelliConstraint.run(model, objectives, maximize, timeoutSec);
                 default:
                     throw new IllegalArgumentException("Invalid front generator: " + frontGenerator);
             }
