@@ -61,6 +61,35 @@ public class ParetoFront {
 		RUN_CACHE.clear();
 	}
 
+	@DataProvider(name = "methods")
+	public Object[][] methods() {
+		return new Object[][]{
+				{"SimpleOptGlobalConstraint"},{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfo"},
+				{"ParetoDisjunctiveProgramming"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
+		};
+	}
+
+	@DataProvider(name = "methodsMaximize")
+	public Object[][] methodsMaximize() {
+		return new Object[][]{
+				{"SimpleOptGlobalConstraint"}, {"SaugmeconNoR"}, {"Saugmecon"}
+		};
+	}
+
+	@DataProvider(name = "methodsMinimize")
+	public Object[][] methodsMinimize() {
+		return new Object[][]{
+				{"ParetoDisjunctiveProgramming"}
+		};
+	}
+
+	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
+	public Object[][] methodsOptimizeObjectivesIndividually() {
+		return new Object[][]{
+				{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoDisjunctiveProgramming"}
+		};
+	}
+
 	@Test(groups = "1s", timeOut = 5000)
 	public void testPareto() {
 		// simple model
@@ -97,14 +126,6 @@ public class ParetoFront {
 		pfJsonToSet(pfJson, method);
 	}
 
-	@DataProvider(name = "methods")
-	public Object[][] methods() {
-		return new Object[][]{
-				{"SimpleOptGlobalConstraint"},{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfo"},
-				{"ParetoDisjunctiveProgramming"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
-		};
-	}
-
 	@Test(dataProvider = "methods", groups = "100s", timeOut = 100_000)
 	public void testParetoMethodsForKnapsack(String method) throws Exception {
 		String[] ukpInstanceFiles = new String[] {
@@ -132,6 +153,36 @@ public class ParetoFront {
 		compareMethodsWithNqueen(baseMethodInComparisson, method, instanceFile, timeoutSec);
 	}
 
+	@Test(dataProvider = "methodsMaximize", groups = "20s", timeOut = 20_000)
+	public void testObjFunctionDiffSignParetoInMinProblemsForMaxStrategies(String method) throws Exception{
+		String instanceFile = "paris_30_cost_clouds.fzn";
+		int timeoutSec = 2;
+		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "fzn_instance");
+		// check if the objective is MAximized
+		String messageToCheck = rr.solverMessages.get(0);
+		assertTrue(messageToCheck.contains("MAXIMIZE"), "MAXIMIZE should be present in the solver messages indicating maximization and not MINIMIZATION " + messageToCheck);
+		String startMax = messageToCheck.substring(messageToCheck.indexOf("MAXIMIZE"));
+		int optFunctionValue = Integer.parseInt(startMax.substring(startMax.indexOf("= ")+2, startMax.indexOf(",")));
+		JSONArray pf = rr.solutionsDetails.getJSONArray("pareto_front");
+		int objValFront = (Integer) pf.getJSONArray(0).get(0);
+		assertTrue((objValFront ^ optFunctionValue) < 0);
+	}
+
+	@Test(dataProvider = "methodsMinimize", groups = "100s", timeOut = 100_000000)
+	public void testObjFunctionDiffSignParetoInMaxProblemsForMinStrategies(String method) throws Exception{
+		String instanceFile = "n_queens_p-3_q-8_ins-1.dat";
+		int timeoutSec = 5;
+		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "nqueens");
+		// check if the objective is MAximized
+		String messageToCheck = rr.solverMessages.get(0);
+		assertTrue(messageToCheck.contains("MINIMIZE"), "MINIMIZE should be present in the solver messages indicating maximization and not MINIMIZATION " + messageToCheck);
+		String startMax = messageToCheck.substring(messageToCheck.indexOf("MINIMIZE"));
+		int optFunctionValue = Integer.parseInt(startMax.substring(startMax.indexOf("= ")+2, startMax.indexOf(",")));
+		JSONArray pf = rr.solutionsDetails.getJSONArray("pareto_front");
+		int objValFront = (Integer) pf.getJSONArray(0).get(0);
+		assertTrue((objValFront ^ optFunctionValue) < 0);
+	}
+
 	private void compareMethodsWithNqueen(String baseMethod, String methodToTest, String instanceFile, int timeoutSec) throws Exception {
 		JSONArray toTestPF = runAndCollectPFStringsNqueens(methodToTest, instanceFile, timeoutSec);
 		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethod, instanceFile, timeoutSec);
@@ -140,8 +191,8 @@ public class ParetoFront {
 	}
 
 	private void compareMethodsWithKnapsack(String baseMethod, String methodToTest, String instanceFile, int timeoutSec) throws Exception {
-		JSONArray basePF = runAndCollectPFStringsMOOLibraryKP(baseMethod, instanceFile, timeoutSec);
 		JSONArray toTestPF = runAndCollectPFStringsMOOLibraryKP(methodToTest, instanceFile, timeoutSec);
+		JSONArray basePF = runAndCollectPFStringsMOOLibraryKP(baseMethod, instanceFile, timeoutSec);
 
 		compareParetoFrontJson(basePF, toTestPF, baseMethod, methodToTest);
 	}
@@ -232,13 +283,6 @@ public class ParetoFront {
 						+ "\nExtra in " + method + ": " + extraInMethod);
 			}
 		}
-	}
-
-	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
-	public Object[][] methodsOptimizeObjectivesIndividually() {
-		return new Object[][]{
-				{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoDisjunctiveProgramming"}
-		};
 	}
 
 	@Test(dataProvider = "methodsOptimizeObjectivesIndividually", groups = "5s", timeOut = 300_000)

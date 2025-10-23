@@ -53,6 +53,11 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
     private final int n;
 
     //private final int[] vals;
+    // DEBUG (public, quick-and-dirty): times in nanoseconds
+    public long timeFindingTightestPoint = 0L;
+    public long timeAddingSolutionToArchiveRemovingDominates = 0L;
+    public int sameSolutionReached = 0;
+
 
     //***********************************************************************************
     // CONSTRUCTOR
@@ -102,6 +107,7 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
         for (int i = 0; i < objectives.length; i++) {
             vals[i] = objectives[i].getValue();
         }
+        long __t0_remove = System.nanoTime();
         // remove dominated solutions
         for (int i = paretoFront.size() - 1; i >= 0; i--) {
             if (isDominated(paretoSolutions.get(i), vals)) {
@@ -109,6 +115,7 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
                 paretoFront.remove(i);
             }
         }
+        timeAddingSolutionToArchiveRemovingDominates += System.nanoTime() - __t0_remove;
         // store current solution
         Solution solution;
         if (poolSols.isEmpty()) {
@@ -151,6 +158,7 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
         if (paretoFront.size() > 0) {
             int tightestPoint = Integer.MIN_VALUE;
             int[] dominatedPoint = computeDominatedPoint(i);
+            long __t0_finding_tightest_point = System.nanoTime();
             for (int[] sol : paretoFront) {
                 int dominates = dominates(sol, dominatedPoint, i);
                 if (dominates > 0) {
@@ -164,6 +172,7 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
                     }
                 }
             }
+            timeFindingTightestPoint += System.nanoTime() - __t0_finding_tightest_point;
             if (tightestPoint > Integer.MIN_VALUE) {
                 objectives[i].updateLowerBound(tightestPoint, this);
             }
@@ -199,6 +208,7 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
      */
     private int dominates(int[] a, int[] b, int i) {
         if (Arrays.equals(a, b)) {
+            sameSolutionReached++;
             return 2;
         }
         int dominates = 0;
