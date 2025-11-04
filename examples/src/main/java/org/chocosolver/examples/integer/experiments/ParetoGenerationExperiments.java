@@ -6,6 +6,10 @@ import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.objective.GiaConfig;
 import org.chocosolver.solver.objective.IMultiObjectiveManager;
+import org.chocosolver.solver.objective.mocoframework.MocoStrategy;
+import org.chocosolver.solver.objective.mocoframework.StrategyComponents;
+import org.chocosolver.solver.objective.mocoframework.StrategyFactory;
+import org.chocosolver.solver.objective.mocoframework.enums.*;
 import org.chocosolver.solver.variables.IntVar;
 
 import java.util.*;
@@ -163,7 +167,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
     private static Object[] runFrontStrategy(Model model, IntVar[] objectives, String frontGenerator, boolean maximize, int timeoutSec) {
         model.getSolver().limitTime(timeoutSec + "s");
         return runWithElapsedTime(() -> {
-            if (frontGenerator.contains("GIA")) {
+            if (frontGenerator.contains("GIAtest")) {
                 GiaConfig giaConfig = createGiaConfig(frontGenerator);
                 ParetoGIA paretoGIA = ParetoGIAFactory.createSolver(giaConfig, timeoutSec);
                 if (frontGenerator.contains("regionImplementation"))
@@ -174,35 +178,85 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 case "ParetoDisjunctiveProgrammingRegSelImproAll":
                     ParetoDisjunctiveProgramming paretoDisjunctiveProgrammingRegSelImprAll = new ParetoDisjunctiveProgramming();
                     return paretoDisjunctiveProgrammingRegSelImprAll.run(model, objectives, maximize, timeoutSec, false);
-                case "ParetoDisjunctiveProgramming":
+                case "ParetoDisjunctiveProgrammingTest":
                     ParetoDisjunctiveProgramming paretoDisjunctiveProgramming = new ParetoDisjunctiveProgramming();
                     return paretoDisjunctiveProgramming.run(model, objectives, maximize, timeoutSec, true);
-                case "ParetoGavanelliGlobalConstraintNoEvolutionInfo":
+                case "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest":
                     Pareto pareto = new Pareto();
                     return pareto.run(model, objectives, maximize);
-                case "ParetoGavanelliGlobalConstraint":
+                case "ParetoGavanelliGlobalConstraintTest":
                     ParetoGavanelliFrontEvolutionInfo paretoGavanelliFrontEvolutionInfo = new ParetoGavanelliFrontEvolutionInfo();
                     return paretoGavanelliFrontEvolutionInfo.run(model, objectives, maximize);
-                case "SaugmeconNoR":
+                case "SaugmeconNoRTest":
                     ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursive = new ParetoSaugmeconNoRecursive();
                     return paretoSaugmeconNoRecursive.run(model, objectives, maximize, true, timeoutSec);
-                case "SaugmeconNoRFrontVerify":
+                case "SaugmeconNoRFrontVerifyTest":
                     ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursiveFrontVerify = new ParetoSaugmeconNoRecursive();
                     return paretoSaugmeconNoRecursiveFrontVerify.run(model, objectives, maximize, false, timeoutSec);
-                case "Saugmecon":
+                case "SaugmeconTest":
                     ParetoSaugmecon paretoSaugmeconLex = new ParetoSaugmecon(true);
                     return paretoSaugmeconLex.run(model, objectives, maximize, timeoutSec);
-                case "SaugmeconFrontVerify":
+                case "SaugmeconFrontVerifyTest":
                     ParetoSaugmecon paretoSaugmecon = new ParetoSaugmecon(false);
                     return paretoSaugmecon.run(model, objectives, maximize, timeoutSec);
-                case "SimpleOptGlobalConstraint":
+                case "SimpleOptGlobalConstraintTest":
                     ParetoOptimizeSumGavanelliConstraint paretoOptimizeSumGavanelliConstraint = new ParetoOptimizeSumGavanelliConstraint();
                     return paretoOptimizeSumGavanelliConstraint.run(model, objectives, maximize, timeoutSec);
-                default:
-                    throw new IllegalArgumentException("Invalid front generator: " + frontGenerator);
+                default: {
+                    StrategyComponents components = getStrategyComponentsFromKeyword(frontGenerator);
+                    MocoStrategy strategy = new MocoStrategy(components);
+                    List<Solution> front = strategy.execute(model, objectives, maximize);
+                    List<String> stats = List.of(model.getSolver().getMeasures().toString());
+                    return new Object[]{front, stats};
+                }
             }
         });
     }
+
+    private static StrategyComponents getStrategyComponentsFromKeyword(String keyword) {
+        switch (keyword) {
+            case "Gavanelli":
+                return new StrategyComponents(
+                        StrategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        List.of(StrategyFactory.getPreprocessing(PreprocessingType.GAVANELLI)),
+                        StrategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        StrategyFactory.getFindSolution(FindSolutionType.SOLVE),
+                        StrategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
+                );
+            case "Saugmecon":
+                return new StrategyComponents(
+                        StrategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        List.of(StrategyFactory.getPreprocessing(PreprocessingType.SAUGMECON)),
+                        StrategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        StrategyFactory.getFindSolution(FindSolutionType.OPTIMIZE),
+                        StrategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
+                );
+//            case "GIA":
+//            case "SimpleOptGlobalConstraint":
+//                return new StrategyComponents(
+//                        StrategyFactory.getInitialRegion(InitialRegionType.WHOLEOBJECTIVE),
+//                        List.of(StrategyFactory.getPreprocessing(PreprocessingType.GAVANELLI)),
+//                        StrategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+//                        StrategyFactory.getFindSolution(FindSolutionType.OPTIMIZEPARETOGLOBALCONSTRAINT),
+//                        StrategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
+//                );
+//            case "ParetoDisjunctiveProgramming":
+//                return new StrategyComponents(
+//                        StrategyFactory.getInitialRegion(InitialRegionType.WHOLEOBJECTIVE),
+//                        List.of(StrategyFactory.getPreprocessing(PreprocessingType.SAUGMECON)),
+//                        StrategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+//                        StrategyFactory.getFindSolution(FindSolutionType.SOLVE),
+//                        StrategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
+//                );
+            // Add more cases here as needed
+            default:
+                if (keyword.startsWith("MocoFrameworkStrate-")) {
+                    return StrategyParser.parse(keyword);
+                }
+                throw new IllegalArgumentException("Invalid front generator: " + keyword);
+        }
+    }
+
 
     private static Object[] runFrontStrategyWithPortfolio(ModelObjectivesVariables[] modelObjectivesVariables, String frontGenerator, boolean maximize, int timeoutSec) {
         // todo the implementation of the portfolio is not finished, needs to be tested

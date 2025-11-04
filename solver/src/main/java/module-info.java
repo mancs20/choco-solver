@@ -191,4 +191,13 @@ module org.chocosolver.solver {
     opens org.chocosolver.memory.structure to sizeof;
     opens org.chocosolver.solver.search.loop to sizeof;
     exports org.chocosolver.util.moexperiments;
+    exports org.chocosolver.solver.objective.mocoframework;
+    opens org.chocosolver.solver.objective.mocoframework to sizeof;
+    exports org.chocosolver.solver.objective.mocoframework.component.initialregion;
+    exports org.chocosolver.solver.objective.mocoframework.component.preprocessing;
+    exports org.chocosolver.solver.objective.mocoframework.component.selectregion;
+    exports org.chocosolver.solver.objective.mocoframework.component.findsolution;
+    exports org.chocosolver.solver.objective.mocoframework.component.updateregions;
+    exports org.chocosolver.solver.objective.mocoframework.structure;
+    exports org.chocosolver.solver.objective.mocoframework.enums;
 }

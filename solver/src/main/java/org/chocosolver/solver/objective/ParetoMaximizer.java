@@ -40,8 +40,8 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
     //***********************************************************************************
 
     // Set of incomparable and Pareto-best solutions
-    private final List<Solution> paretoSolutions;
-    private final List<int[]> paretoFront;
+    private List<Solution> paretoSolutions;
+    private List<int[]> paretoFront;
 
     private final Model model;
 
@@ -83,6 +83,11 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
         n = objectives.length;
         model = objectives[0].getModel();
         //vals = new int[n];
+    }
+
+    public void setSharedFront(List<Solution> sharedParetoSolutions, List<int[]> sharedParetoValues) {
+        this.paretoSolutions = sharedParetoSolutions;
+        this.paretoFront = sharedParetoValues;
     }
 
     //***********************************************************************************
