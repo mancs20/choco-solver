@@ -128,11 +128,10 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
                     }
                 }
                 solver.removeStopCriterion();
-                if (solution != null && solution.exists() && saveStats) {
+                if (saveStats) {
                     recorderList.add(solver.getMeasures().toString());
-                } else {
-                    solution = null;
                 }
+                if (solution == null || !solution.exists()) solution = null;
                 if (!solver.isStopCriterionMet()){
                     solver.reset();
                     solveCallsCount++;
@@ -247,6 +246,10 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
                 System.out.println("Stop criterion reached, the Pareto front may be incomplete");
                 addBestObjetiveValuesAsSolutionIfNotDomanited();
                 removeLastSolutionIfDominated();
+            }
+        } else {
+            for (int i = 0; i < objectives.length; i++) {
+                recorderList.set(i, "No solution" + recorderList.get(i));
             }
         }
         for (int i = 0; i < bestObjectiveValues.length; i++) {

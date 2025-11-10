@@ -386,11 +386,10 @@ public class ParetoSaugmecon implements TimeoutHolder {
                     }
                 }
                 solver.removeStopCriterion();
-                if (solution != null && solution.exists() && saveStats) {
+                if (saveStats) {
                     recorderList.add(solver.getMeasures().toString());
-                } else {
-                    solution = null;
                 }
+                if (solution == null || !solution.exists()) solution = null;
                 if (!solver.isStopCriterionMet()){
                     solver.reset();
                 }else {
