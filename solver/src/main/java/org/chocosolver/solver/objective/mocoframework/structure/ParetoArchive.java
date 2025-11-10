@@ -11,11 +11,13 @@ public class ParetoArchive {
     private final List<Solution> paretoSolutions;
 
     private final IntVar[] objectives;
+    private int[] lastAddedSolutionObjValues;
 
     public ParetoArchive(IntVar[] objectives) {
         this.objectives = objectives.clone();
         this.paretoFront = new ArrayList<>();
         this.paretoSolutions = new ArrayList<>();
+        lastAddedSolutionObjValues = null;
     }
 
     public List<Solution> getParetoFrontSolutions() {
@@ -23,6 +25,21 @@ public class ParetoArchive {
     }
     public List<int[]> getParetoFrontValues() {
         return paretoFront;
+    }
+
+    public void add(Solution solution, boolean checkDominanceWhenAdding) {
+        if (solution != null) {
+            if (checkDominanceWhenAdding) {
+                add(solution);
+            } else {
+                int[] vals = new int[objectives.length];
+                if(differentFromLast(vals, solution)){
+                    lastAddedSolutionObjValues = vals;
+                    paretoSolutions.add(solution);
+                    paretoFront.add(vals);
+                }
+            }
+        }
     }
 
     /**
@@ -34,29 +51,28 @@ public class ParetoArchive {
     public void add(Solution solution) {
         int isDominated = -1;
         if (solution != null) {
-            // get objective values
             int[] vals = new int[objectives.length];
-            for (int i = 0; i < objectives.length; i++) {
-                vals[i] = objectives[i].getValue();
-            }
-            for (int i = paretoSolutions.size() - 1; i >= 0; i--) {
-                isDominated = isDominated(paretoFront.get(i), vals);
-                if (isDominated > 0) {
-                    paretoSolutions.remove(i);
-                    paretoFront.remove(i);
-                } else if (isDominated == 0) {
-                    break;
+            if (differentFromLast(vals, solution)) {
+                for (int i = paretoSolutions.size() - 1; i >= 0; i--) {
+                    isDominated = firstIsDominatedBySecond(paretoFront.get(i), vals);
+                    if (isDominated > 0) {
+                        paretoSolutions.remove(i);
+                        paretoFront.remove(i);
+                    } else if (isDominated == 0) {
+                        break;
+                    }
                 }
-            }
-            if (isDominated != 0) {
-                paretoSolutions.add(solution);
-                paretoFront.add(vals);
+                if (isDominated != 0) {
+                    paretoSolutions.add(solution);
+                    paretoFront.add(vals);
+                }
+                lastAddedSolutionObjValues = vals;
             }
         }
     }
 
-    private int isDominated(int[] archiveSolution, int[] vals) {
-        int delta = 1;
+    public int firstIsDominatedBySecond(int[] archiveSolution, int[] vals) {
+        int delta = 0;
         for (int i = 0; i < objectives.length; i++) {
             int deltaTmp = vals[i] - archiveSolution[i];
             if (deltaTmp < 0) {
@@ -66,6 +82,17 @@ public class ParetoArchive {
             }
         }
         return delta;
+    }
+
+    private boolean differentFromLast(int[] vals, Solution solution) {
+        boolean equalToLast = true;
+        for (int i = 0; i < objectives.length; i++) {
+            vals[i] = solution.getIntVal(objectives[i]);
+            if (lastAddedSolutionObjValues == null || vals[i] != lastAddedSolutionObjValues[i]) {
+                equalToLast = false;
+            }
+        }
+        return !equalToLast;
     }
 
     public void clear() {
@@ -78,5 +105,9 @@ public class ParetoArchive {
 
     public int size() {
         return paretoSolutions.size();
+    }
+
+    public void setLastAddedSolutionObjValues(int[] lastAddedSolutionObjValues) {
+        this.lastAddedSolutionObjValues = lastAddedSolutionObjValues;
     }
 }

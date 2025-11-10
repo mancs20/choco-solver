@@ -200,4 +200,7 @@ module org.chocosolver.solver {
     exports org.chocosolver.solver.objective.mocoframework.component.updateregions;
     exports org.chocosolver.solver.objective.mocoframework.structure;
     exports org.chocosolver.solver.objective.mocoframework.enums;
+    exports org.chocosolver.solver.objective.mocoframework.component.objectivefunction;
+    exports org.chocosolver.solver.objective.mocoframework.util;
+    opens org.chocosolver.solver.objective.mocoframework.structure to sizeof;
 }

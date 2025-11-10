@@ -4,6 +4,7 @@ import org.chocosolver.solver.objective.mocoframework.StrategyComponents;
 import org.chocosolver.solver.objective.mocoframework.StrategyFactory;
 import org.chocosolver.solver.objective.mocoframework.component.findsolution.FindNonDominatedSolutionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.initialregion.InitialRegionStrategy;
+import org.chocosolver.solver.objective.mocoframework.component.objectivefunction.ObjectiveFunctionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.preprocessing.PreprocessingStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.selectregion.SelectRegionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.updateregions.UpdateRegionsStrategy;
@@ -23,32 +24,41 @@ public class StrategyParser {
         InitialRegionStrategy initialRegion = null;
         List<PreprocessingStrategy> preprocessingList = new ArrayList<>();
         SelectRegionStrategy selectRegion = null;
-        FindNonDominatedSolutionStrategy findSolution = null;
+        FindSolutionType findSolutionType = null;
+        ObjectiveFunctionType objectiveFunctionType = null;
         UpdateRegionsStrategy updateRegions = null;
 
-
+        StrategyFactory strategyFactory = new StrategyFactory();
         for (String part : parts) {
             if (part.startsWith("Init_")) {
                 String key = part.substring(5).toUpperCase();
-                initialRegion = StrategyFactory.getInitialRegion(InitialRegionType.valueOf(key));
+                initialRegion = strategyFactory.getInitialRegion(InitialRegionType.valueOf(key));
             } else if (part.startsWith("Prepro_")) {
                 String[] keys = part.substring(7).split("_");
                 for (String key : keys) {
-                    preprocessingList.add(StrategyFactory.getPreprocessing(PreprocessingType.valueOf(key.toUpperCase())));
+                    preprocessingList.add(strategyFactory.getPreprocessing(PreprocessingType.valueOf(key.toUpperCase())));
                 }
-            } else if (part.startsWith("Sel_")) {
+            } else if (part.startsWith("ObjFun_")) {
+                String key = part.substring(7).toUpperCase();
+                objectiveFunctionType = ObjectiveFunctionType.valueOf(key);
+            }
+            else if (part.startsWith("Sel_")) {
                 String key = part.substring(4).toUpperCase();
-                selectRegion = StrategyFactory.getSelectRegion(SelectRegionType.valueOf(key));
+                selectRegion = strategyFactory.getSelectRegion(SelectRegionType.valueOf(key));
             } else if (part.startsWith("FindSol_")) {
                 String key = part.substring(8).toUpperCase();
-                findSolution = StrategyFactory.getFindSolution(FindSolutionType.valueOf(key));
+                findSolutionType = FindSolutionType.valueOf(key);
             } else if (part.startsWith("Update_")) {
                 String key = part.substring(7).toUpperCase();
-                updateRegions = StrategyFactory.getUpdateRegion(UpdateRegionType.valueOf(key));
+                updateRegions = strategyFactory.getUpdateRegion(UpdateRegionType.valueOf(key));
             } else {
                 throw new IllegalArgumentException("Unknown strategy part: " + part);
             }
         }
+
+        ObjectiveFunctionStrategy objectiveFunction =
+                strategyFactory.getObjectiveFunctionOrDefault(objectiveFunctionType);
+        FindNonDominatedSolutionStrategy findSolution = strategyFactory.getFindSolutionOrDefault(findSolutionType);
 
         // check for missing components
         if (initialRegion == null) {
@@ -60,15 +70,14 @@ public class StrategyParser {
         if (selectRegion == null) {
             throw new IllegalArgumentException("SelectRegion component is missing.");
         }
-        if (findSolution == null) {
-            throw new IllegalArgumentException("FindSolution component is missing.");
-        }
         if (updateRegions == null) {
             throw new IllegalArgumentException("UpdateRegions component is missing.");
         }
 
-        return new StrategyComponents(initialRegion,
+        return new StrategyComponents(
+                initialRegion,
                 preprocessingList,
+                objectiveFunction,
                 selectRegion,
                 findSolution,
                 updateRegions);

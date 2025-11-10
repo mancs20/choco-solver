@@ -1,32 +1,46 @@
 package org.chocosolver.solver.objective.mocoframework.structure;
 
+import org.chocosolver.solver.Model;
 import org.chocosolver.solver.constraints.Constraint;
 
-import java.util.Set;
+import java.util.List;
 
 public class Region {
-    private final Set<Constraint> constraints;
-    private boolean dummy = false;
+    private List<Constraint> constraints;
 
     public Region() {
-        this.dummy = true;
         this.constraints = null;
     }
 
-    public Region(Set<Constraint> constraints) {
+    public Region(List<Constraint> constraints) {
         this.constraints = constraints;
     }
 
-    public Set<Constraint> getConstraints() {
+    public List<Constraint> getConstraints() {
         return constraints;
     }
 
-    public boolean isDummy() {
-        return dummy;
+    public void setConstraints(List<Constraint> constraints) {
+        this.constraints = constraints;
     }
 
-//    @Override
-//    public String toString() {
-//        return constraints.toString();
-//    }
+    public boolean hasConstraints() {
+        return constraints != null && !constraints.isEmpty();
+    }
+
+    public void unpostConstraints(Model model) {
+        if (hasConstraints()) {
+            for (Constraint c : constraints) {
+                model.unpost(c);
+            }
+        }
+    }
+
+    public void postConstraints() {
+        if (hasConstraints()) {
+            for (Constraint c : constraints) {
+                c.post();
+            }
+        }
+    }
 }

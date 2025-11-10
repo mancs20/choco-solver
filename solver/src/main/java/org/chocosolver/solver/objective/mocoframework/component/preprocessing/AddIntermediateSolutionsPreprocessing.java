@@ -7,6 +7,9 @@ import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.criteria.Criterion;
 
 
-public interface PreprocessingStrategy {
-    void apply(Model model, IntVar[] objectives, ParetoArchive archive, StrategyParams params, Criterion... stop);
+public class AddIntermediateSolutionsPreprocessing implements PreprocessingStrategy{
+    @Override
+    public void apply(Model model, IntVar[] objectives, ParetoArchive archive, StrategyParams params, Criterion... stop) {
+        params.setAddIntermediateSolutions(true);
+    }
 }

@@ -2,31 +2,44 @@ package org.chocosolver.solver.objective.mocoframework;
 
 import org.chocosolver.solver.objective.mocoframework.component.findsolution.*;
 import org.chocosolver.solver.objective.mocoframework.component.initialregion.*;
+import org.chocosolver.solver.objective.mocoframework.component.objectivefunction.NoneObjectiveFunction;
+import org.chocosolver.solver.objective.mocoframework.component.objectivefunction.ObjectiveFunctionStrategy;
+import org.chocosolver.solver.objective.mocoframework.component.objectivefunction.SumObjectiveFunctionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.preprocessing.*;
 import org.chocosolver.solver.objective.mocoframework.component.selectregion.*;
 import org.chocosolver.solver.objective.mocoframework.component.updateregions.*;
 import org.chocosolver.solver.objective.mocoframework.enums.*;
+import org.chocosolver.solver.objective.mocoframework.util.SolutionFinder;
 
 public class StrategyFactory {
 
-    public static InitialRegionStrategy getInitialRegion(InitialRegionType type) {
+    private final SolutionFinder sharedSolutionFinder;
+
+    public StrategyFactory() {
+        this.sharedSolutionFinder = new SolutionFinder(); // One shared instance
+    }
+
+    public InitialRegionStrategy getInitialRegion(InitialRegionType type) {
         InitialRegionStrategy strategy;
         if (type == InitialRegionType.ENTIRE_OBJECTIVE_SPACE) {
-            strategy = new WholeObjectiveRegion();
+            strategy = new EntireObjectiveRegion();
         } else {
             throw new IllegalArgumentException("Unknown InitialRegionType: " + type);
         }
         return strategy;
     }
 
-    public static PreprocessingStrategy getPreprocessing(PreprocessingType type) {
+    public PreprocessingStrategy getPreprocessing(PreprocessingType type) {
         PreprocessingStrategy strategy;
         switch (type) {
             case GAVANELLI:
                 strategy = new GavanelliPrepro();
                 break;
             case SAUGMECON:
-                strategy = new SaugmeconPreprocessing();
+                strategy = new SaugmeconPreprocessing(this.sharedSolutionFinder);
+                break;
+            case ADD_INTERMEDIATE_SOLUTIONS:
+                strategy = new AddIntermediateSolutionsPreprocessing();
                 break;
             default:
                 throw new IllegalArgumentException("Unknown PreprocessingType: " + type);
@@ -34,29 +47,43 @@ public class StrategyFactory {
         return strategy;
     }
 
-    public static SelectRegionStrategy getSelectRegion(SelectRegionType type) {
-        SelectRegionStrategy strategy;
+    public ObjectiveFunctionStrategy getObjectiveFunction(ObjectiveFunctionType type) {
         switch (type) {
-            case SINGLE:
-                strategy = new SingleRegionSelector();
-                break;
+            case SUM:
+                return new SumObjectiveFunctionStrategy();
+            case NONE:
+                return new NoneObjectiveFunction();
             default:
-                throw new IllegalArgumentException("Unknown SelectRegionType: " + type);
+                throw new IllegalArgumentException("Unknown ObjectiveFunctionType: " + type);
+        }
+    }
+
+    public ObjectiveFunctionStrategy getObjectiveFunctionOrDefault(ObjectiveFunctionType type) {
+        if (type == null || type == ObjectiveFunctionType.NONE) {
+            return new NoneObjectiveFunction();
+        } else {
+            return getObjectiveFunction(type); // extendable later
+        }
+    }
+
+    public SelectRegionStrategy getSelectRegion(SelectRegionType type) {
+        SelectRegionStrategy strategy;
+        if (type == SelectRegionType.SINGLE) {
+            strategy = new SingleRegionSelector();
+        } else {
+            throw new IllegalArgumentException("Unknown SelectRegionType: " + type);
         }
         return strategy;
     }
 
-    public static FindNonDominatedSolutionStrategy getFindSolution(FindSolutionType type) {
+    public FindNonDominatedSolutionStrategy getFindSolution(FindSolutionType type) {
         FindNonDominatedSolutionStrategy strategy;
         switch (type) {
-            case SOLVE:
-                strategy = new SolveStrategy();
+            case GENERIC:
+                strategy = new DefaultFindSolutionStrategy(this.sharedSolutionFinder);
                 break;
-            case OPTIMIZE:
-                strategy = new OptimizeStrategy();
-                break;
-            case OPTIMIZE_PARETO_GLOBAL_CONSTRAINT:
-                strategy = new OptimizeParetoGlobalStrategy();
+            case SAUGMECON:
+                strategy = new SaugmeconFindSolution(this.sharedSolutionFinder);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown FindSolutionType: " + type);
@@ -64,7 +91,15 @@ public class StrategyFactory {
         return strategy;
     }
 
-    public static UpdateRegionsStrategy getUpdateRegion(UpdateRegionType type) {
+    public FindNonDominatedSolutionStrategy getFindSolutionOrDefault(FindSolutionType type) {
+        if (type == null || type == FindSolutionType.GENERIC) {
+            return new DefaultFindSolutionStrategy(this.sharedSolutionFinder);
+        } else {
+            return getFindSolution(type); // allows throwing if you later add more types
+        }
+    }
+
+    public UpdateRegionsStrategy getUpdateRegion(UpdateRegionType type) {
         UpdateRegionsStrategy strategy;
         switch (type) {
             case GAVANELLI:

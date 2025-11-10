@@ -7,7 +7,7 @@ import org.chocosolver.solver.variables.IntVar;
 import java.util.HashSet;
 import java.util.Set;
 
-public class WholeObjectiveRegion implements InitialRegionStrategy{
+public class EntireObjectiveRegion implements InitialRegionStrategy{
     @Override
     public Set<Region> computeInitialRegion(Model model, IntVar[] objectives) {
         Set<Region> regions = new HashSet<>();
