@@ -4,6 +4,7 @@ import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.objective.mocoframework.StrategyParams;
+import org.chocosolver.solver.objective.mocoframework.component.findsolution.SolutionEpsilonArrayInformation;
 import org.chocosolver.solver.objective.mocoframework.structure.ParetoArchive;
 import org.chocosolver.solver.objective.mocoframework.structure.Region;
 import org.chocosolver.solver.variables.IntVar;
@@ -36,12 +37,88 @@ public class SaugmeconUpdate implements UpdateRegionsStrategy{
 //        } else{
 //            regions.clear();
 //        }
-        updateEpsilon(epsilonArr, solution, objectives, params);
-        if (ideal[ideal.length - 1] >= epsilonArr[epsilonArr.length - 1]) {
-            updateRegionConstraints(regions.iterator().next(), objectives, epsilonArr);
-        } else{
-            regions.clear();
+        while (!regions.isEmpty()) {
+            updateEpsilon(epsilonArr, solution, objectives, params);
+            if (ideal[ideal.length - 1] >= epsilonArr[epsilonArr.length - 1]) {
+                SolutionEpsilonArrayInformation previousSolutionInfo = previousSolutionSatisfyCurrentEpsilon(epsilonArr, params);
+                if (previousSolutionInfo == null) {
+                    // no previous solution process satisfies the current epsilon values
+                    updateRegionConstraints(regions.iterator().next(), objectives, epsilonArr);
+                    break;
+                } else if (previousSolutionInfo.isFeasible()) {
+                    solution = previousSolutionInfo.getSolverSolution();
+                } else {
+                    solution = null;
+                }
+            } else {
+                regions.clear();
+            }
         }
+    }
+
+    private SolutionEpsilonArrayInformation previousSolutionSatisfyCurrentEpsilon(int[] epsilonArr, StrategyParams params) {
+        List<SolutionEpsilonArrayInformation> previousSolutionInformation = params.getPreviousSolutionInfo();
+        Set<String> previousSolutions = params.getPreviousSolutions();
+        assert previousSolutions != null;
+
+        return searchPreviousSolutionsRelaxation(epsilonArr, previousSolutionInformation);
+    }
+
+    private SolutionEpsilonArrayInformation searchPreviousSolutionsRelaxation(int[] efArrayActual, List<SolutionEpsilonArrayInformation> previousSolutionInformation){
+        SolutionEpsilonArrayInformation previousSolution;
+        int idPreviousCloserRelaxation = getLessConstrainedPreviousSolutions(efArrayActual, previousSolutionInformation);
+        if (idPreviousCloserRelaxation != -1) {
+            previousSolution = previousSolutionInformation.get(idPreviousCloserRelaxation);
+        }else{
+            previousSolution = null;
+        }
+        return previousSolution;
+    }
+
+    private int getLessConstrainedPreviousSolutions(int[] efArrayActual, List<SolutionEpsilonArrayInformation> previousSolutionInformation){
+        if (previousSolutionInformation.isEmpty()) {
+            return -1;
+        }
+        int idx = previousSolutionInformation.size() - 1;
+        boolean solutionWithMoreRelaxationFound = false;
+        while (!solutionWithMoreRelaxationFound && idx > -1) {
+            if (efArray1LessConstraintEfArray2(previousSolutionInformation.get(idx).getEfArray(), efArrayActual)) {
+                int[] fSolutionValues = previousSolutionInformation.get(idx).getSolution();
+                solutionWithMoreRelaxationFound = true;
+                if (previousSolutionInformation.get(idx).isFeasible()) {
+                    int[] fSolutionValuesForConstraint = Arrays.copyOfRange(fSolutionValues, 1, fSolutionValues.length);
+                    if (!solutionSatisfyEfArr(fSolutionValuesForConstraint, efArrayActual)) {
+                        solutionWithMoreRelaxationFound = false;
+                        idx -= 1;
+                    }
+                }
+            } else {
+                idx -= 1;
+            }
+        }
+        return idx;
+    }
+
+    private static boolean efArray1LessConstraintEfArray2(int[] efArray1, int[] efArray2) {
+        boolean lessConstrained = true;
+        for (int i = 0; i < efArray1.length; i++) {
+            if (efArray1[i] > efArray2[i]) {
+                lessConstrained = false;
+                break;
+            }
+        }
+        return lessConstrained;
+    }
+
+    private static boolean solutionSatisfyEfArr(int[] solutionValues, int[] efArray) {
+        boolean satisfy = true;
+        for (int i = 0; i < solutionValues.length; i++) {
+            if (solutionValues[i] < efArray[i]) {
+                satisfy = false;
+                break;
+            }
+        }
+        return satisfy;
     }
 
     private void updateRegionConstraints(Region region, IntVar[] objectives, int[] epsilonArr){
@@ -63,7 +140,6 @@ public class SaugmeconUpdate implements UpdateRegionsStrategy{
     }
 
     private void updateEpsilon(int[] epsilonArr, Solution solution, IntVar[] objectives, StrategyParams params){
-        // params
         int[] rwv = params.getRwv();
         int[] ideal = params.getIdealPoint();
         int[] nadir = params.getNadirPoint();
@@ -72,22 +148,18 @@ public class SaugmeconUpdate implements UpdateRegionsStrategy{
         }
 
         if (solution != null) {
-            int[] solutionObjectiveValues = new int[objectives.length];
-            for (int i = 0; i < objectives.length; i++) {
-                solutionObjectiveValues[i] = solution.getIntVal(objectives[i]);
-            }
-            updateRelativeWorstValues(solutionObjectiveValues, rwv);
+            updateRelativeWorstValues(solution, objectives, rwv);
         } else {
             earlyExitAfterInfeasibility(epsilonArr, ideal, nadir);
         }
         updateEpsilonValues(epsilonArr, ideal, nadir, rwv);
     }
 
-    private void updateRelativeWorstValues(int[] solutionObjectiveValues, int[] rwv) {
-        rwv[0] = solutionObjectiveValues[1];
-        if (solutionObjectiveValues.length > 2) {
+    private void updateRelativeWorstValues(Solution solution, IntVar[] objectives, int[] rwv) {
+        rwv[0] = solution.getIntVal(objectives[1]);
+        if (objectives.length > 2) {
             for (int i = 1; i < rwv.length; i++) {
-                rwv[i] = Math.min(rwv[i], solutionObjectiveValues[i+1]);
+                rwv[i] = Math.min(rwv[i], solution.getIntVal(objectives[i+1]));
             }
         }
     }

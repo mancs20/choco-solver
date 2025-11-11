@@ -93,10 +93,12 @@ public class SaugmeconPreprocessing extends BasePreprocessing {
             for (int i = 0; i < idealValues.length; i++) {
                 range[i] = Math.abs(idealValues[i] - nadirValues[i]);
             }
-            int rangeMultiplier;
-            rangeMultiplier = (int) lcm(range);
-            if (rangeMultiplier >= Integer.MAX_VALUE) {
+            int rangeMultiplier = 0;
+            long lcmValue = lcm(range);
+            if (lcmValue >= Integer.MAX_VALUE) {
                 cannotUseSaugmeconObjective = true;
+            } else {
+                rangeMultiplier = (int) lcmValue;
             }
 
             if (!cannotUseSaugmeconObjective) {
@@ -140,9 +142,7 @@ public class SaugmeconPreprocessing extends BasePreprocessing {
         }
         if (!cannotUseSaugmeconObjective) {
             IntVar saugmeconObjective = model.intVar("saugmeconObjective", lbSaugmeconObjective, ubSaugmeconObjective);
-            IntVar[] saugmeconObjectiveArr = new IntVar[objectives.length];
-            System.arraycopy(objectives, 0, saugmeconObjectiveArr, 0, objectives.length);
-            Constraint objectiveFunction = model.scalar(saugmeconObjectiveArr, coefficients, "=", saugmeconObjective);
+            Constraint objectiveFunction = model.scalar(objectives, coefficients, "=", saugmeconObjective);
             objectiveFunction.post();
             model.setObjective(true, saugmeconObjective);
             return objectiveFunction;

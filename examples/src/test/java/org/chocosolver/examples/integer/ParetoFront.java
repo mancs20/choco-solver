@@ -25,10 +25,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.io.StringReader;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -64,29 +62,31 @@ public class ParetoFront {
 	@DataProvider(name = "methods")
 	public Object[][] methods() {
 		return new Object[][]{
-				{"SimpleOptGlobalConstraint"},{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfo"},
-				{"ParetoDisjunctiveProgramming"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
+				{"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}
+//				{"SaugmeconNoRTest"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
+//				{"Gavanelli"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
+//				{"ParetoDisjunctive"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
 		};
 	}
 
 	@DataProvider(name = "methodsMaximize")
 	public Object[][] methodsMaximize() {
 		return new Object[][]{
-				{"SimpleOptGlobalConstraint"}, {"SaugmeconNoR"}, {"Saugmecon"}
+				{"SimpleOptGlobalConstraintTest"}, {"Saugmecon"}, {"ParetoDisjunctive"}
 		};
 	}
 
 	@DataProvider(name = "methodsMinimize")
 	public Object[][] methodsMinimize() {
 		return new Object[][]{
-				{"ParetoDisjunctiveProgramming"}
+				{"ParetoDisjunctiveProgrammingTest"}
 		};
 	}
 
 	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
 	public Object[][] methodsOptimizeObjectivesIndividually() {
 		return new Object[][]{
-				{"SaugmeconNoR"}, {"Saugmecon"}, {"ParetoDisjunctiveProgramming"}
+				{"Saugmecon"},{"SaugmeconNoRTest"}, {"ParetoDisjunctive"}
 		};
 	}
 
@@ -109,15 +109,16 @@ public class ParetoFront {
 		}
 	}
 
-	@Test(dataProvider = "methods", groups = "10s", timeOut = 10000_000)
+	@Test(dataProvider = "methods", groups = "10s", timeOut = 10_000)
 	public void testParetoWhenTimeoutHappens(String method) throws Exception {
 		String instanceFile = "n_queens_p-2_q-14_ins-4.dat";
 		int timeoutSec = 2;
 		long t0 = System.nanoTime();
 		JSONArray pfJson = runAndCollectPFStringsNqueens(method, instanceFile, timeoutSec);
+		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "nqueens");
 		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
 		System.out.println("Method " + method + " found " + pfJson.length() + " non-dominated solutions in "
-				+ elapsedMs + " ms.");
+				+ elapsedMs + " ms. Exhaustive: " + rr.wasExhaustive() + ". Expected timeout: " + timeoutSec * 1000 + " ms.");
 
 		long upperBoundMs = timeoutSec * 1000 + 500;
 		assertTrue(elapsedMs <= upperBoundMs,
@@ -138,7 +139,7 @@ public class ParetoFront {
 				,"KP_p-5_n-20_ins-2.dat"
 				,"KP_p-5_n-20_ins-7.dat"
 		};
-		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
+		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest";
 		int timeoutSec = 100;
 		for (String instance: ukpInstanceFiles) {
 			compareMethodsWithKnapsack(baseMethodInComparisson, method, instance, timeoutSec);
@@ -149,8 +150,38 @@ public class ParetoFront {
 	public void testParetoMethods(String method) throws Exception {
 		String instanceFile = "n_queens_p-5_q-8_ins-1.dat";
 		int timeoutSec = 10;
-		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
+		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest";
+		long t0 = System.nanoTime();
 		compareMethodsWithNqueen(baseMethodInComparisson, method, instanceFile, timeoutSec);
+		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+		System.out.println("Method " + method + " compared to " + baseMethodInComparisson + " in "
+				+ elapsedMs + " ms.");
+	}
+
+	@Test(groups = "200s", timeOut = 200_000)
+	public void testFrameworkSaugmeconVsNonFramework() throws Exception {
+		String instanceFile = "n_queens_p-5_q-8_ins-1.dat";
+		int timeoutSec = 20;
+		String baseMethodInComparisson = "SaugmeconNoRTest";
+		long t0 = System.nanoTime();
+		String method = "Saugmecon";
+		compareFrontSameOrderMethodsWithNqueen(baseMethodInComparisson, method, instanceFile, timeoutSec);
+		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+		System.out.println("Method " + method + " compared to " + baseMethodInComparisson + " in "
+				+ elapsedMs + " ms.");
+	}
+
+	@Test(groups = "200s", timeOut = 200_000)
+	public void testFrameworkGavanelliVsNonFramework() throws Exception {
+		String instanceFile = "n_queens_p-5_q-8_ins-1.dat";
+		int timeoutSec = 20;
+		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest";
+		long t0 = System.nanoTime();
+		String method = "Gavanelli";
+		compareFrontSameOrderMethodsWithNqueen(baseMethodInComparisson, method, instanceFile, timeoutSec);
+		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+		System.out.println("Method " + method + " compared to " + baseMethodInComparisson + " in "
+				+ elapsedMs + " ms.");
 	}
 
 	@Test(dataProvider = "methodsMaximize", groups = "20s", timeOut = 20_000)
@@ -187,22 +218,39 @@ public class ParetoFront {
 		JSONArray toTestPF = runAndCollectPFStringsNqueens(methodToTest, instanceFile, timeoutSec);
 		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethod, instanceFile, timeoutSec);
 
-		compareParetoFrontJson(basePF, toTestPF, baseMethod, methodToTest);
+		compareParetoFrontJson(basePF, toTestPF, baseMethod, methodToTest, instanceFile);
+	}
+
+	private void compareFrontSameOrderMethodsWithNqueen(String baseMethod, String methodToTest, String instanceFile, int timeoutSec) throws Exception {
+		JSONArray toTestPF = runAndCollectPFStringsNqueens(methodToTest, instanceFile, timeoutSec);
+		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethod, instanceFile, timeoutSec);
+
+		for (int i = 0; i < basePF.length(); i++) {
+			String pointBase = basePF.getJSONArray(i).toString();
+			String pointToTest = toTestPF.getJSONArray(i).toString();
+			if (!pointBase.equals(pointToTest)) {
+				fail("Different Pareto front order for methods " + baseMethod + " and " + methodToTest
+						+ " at position " + i + ": " + pointBase + " vs " + pointToTest);
+			}
+		}
+
+		System.out.println("Pareto fronts obtained in the same order for methods " + baseMethod + " and " + methodToTest
+				+ " with " + basePF.length() + " solutions.");
 	}
 
 	private void compareMethodsWithKnapsack(String baseMethod, String methodToTest, String instanceFile, int timeoutSec) throws Exception {
 		JSONArray toTestPF = runAndCollectPFStringsMOOLibraryKP(methodToTest, instanceFile, timeoutSec);
 		JSONArray basePF = runAndCollectPFStringsMOOLibraryKP(baseMethod, instanceFile, timeoutSec);
 
-		compareParetoFrontJson(basePF, toTestPF, baseMethod, methodToTest);
+		compareParetoFrontJson(basePF, toTestPF, baseMethod, methodToTest, instanceFile);
 	}
 
-	private void compareParetoFrontJson(JSONArray basePF, JSONArray toTestPF, String baseMethod, String methodToTest) {
+	private void compareParetoFrontJson(JSONArray basePF, JSONArray toTestPF, String baseMethod, String methodToTest, String instanceFile) {
 		Set<String> basePFSet = pfJsonToSet(basePF, baseMethod);
 		Set<String> toTestPFSet = pfJsonToSet(toTestPF, methodToTest);
 
 		assertEquals(toTestPFSet.size(), basePFSet.size(), "Different Pareto front sizes, Gavanelli= "
-				+ basePFSet.size() + " and " + methodToTest + "= " + toTestPFSet.size());
+				+ basePFSet.size() + " and " + methodToTest + "= " + toTestPFSet.size() + " for instance: " + instanceFile);
 
 		if (!toTestPFSet.equals(basePFSet)) {
 			Set<String> missingInMethod = new HashSet<>(basePFSet);
@@ -213,6 +261,9 @@ public class ParetoFront {
 					+ "\nMissing in " + methodToTest + ": " + missingInMethod
 					+ "\nExtra in " + methodToTest + ": " + extraInMethod);
 		}
+
+		System.out.println("Pareto fronts equal for methods " + baseMethod + " and " + methodToTest
+				+ " with " + basePFSet.size() + " solutions for instance: " + instanceFile);
 	}
 
 	@Test(dataProvider = "methods", groups = "35s", timeOut = 40000)
@@ -225,13 +276,14 @@ public class ParetoFront {
 		assertNotNull(pf, String.format("[%s] pareto_front missing.\n%s", method, rr.stdout));
 		assertTrue(pf.length() >= 0, String.format("[%s] pareto_front empty?\n%s", method, rr.stdout));
 		assertAggregatesConsistent(rr.solutionsDetails, rr.solverMessages, rr.stdout);
+		assertTrue(rr.wasExhaustive());
 	}
 
 	@Test(groups = "100s", timeOut = 100_000)
 	public void testParetoMethodsBiObjectiveProblems() throws Exception {
 		String instanceFile = "n_queens_p-2_q-8_ins-1.dat";
 		int timeoutSec = 100;
-		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
+		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest";
 		String[] methodsToCompare = new String[]{"Saugmecon"};
 
 		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethodInComparisson, instanceFile, timeoutSec);
@@ -260,7 +312,7 @@ public class ParetoFront {
 	public void testSaugmeconObjectiveFunction() throws Exception {
 		String instanceFile = "n_queens_p-3_q-8_ins-1.dat";
 		int timeoutSec = 100;
-		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfo";
+		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest";
 		String[] methodsToCompare = new String[]{"Saugmecon"};
 
 		JSONArray basePF = runAndCollectPFStringsNqueens(baseMethodInComparisson, instanceFile, timeoutSec);
@@ -336,24 +388,22 @@ public class ParetoFront {
 
 		// parse solutions-details JSON (output starts from "Starting experiment...")
 		JSONObject lastSolutionsDetails = null;
-		try (BufferedReader br = new BufferedReader(new StringReader(out))) {
-			String line;
-			while ((line = br.readLine()) != null) {
-				line = line.trim();
-				if (!line.startsWith("{") || !line.endsWith("}")) continue;
+		Pattern pattern = Pattern.compile("\\{(?:[^{}]|\\{[^{}]*\\})*\\}");
+		Matcher matcher = pattern.matcher(out);
 
-				JSONObject obj;
-				try {
-					obj = new JSONObject(line);
-				} catch (Exception ignore) {
-					continue;
-				}
-
+		while (matcher.find()) {
+			String candidate = matcher.group();
+			try {
+				JSONObject obj = new JSONObject(candidate);
 				if ("solutions-details".equals(obj.optString("type"))) {
 					lastSolutionsDetails = obj.getJSONObject("solutions-details");
+					break;
 				}
+			} catch (Exception ignore) {
+				// Skip non-JSON or mismatches
 			}
 		}
+
 
 		assertNotNull(lastSolutionsDetails, "No solutions-details JSON found.\nOutput was:\n" + out);
 
@@ -500,6 +550,10 @@ class RunResult {
 		this.solutionsDetails = solutionsDetails;
 		this.solverMessages = solverMessages;
 		this.stdout = stdout;
+	}
+
+	public boolean wasExhaustive() {
+		return solutionsDetails.optBoolean("exhaustive");
 	}
 }
 

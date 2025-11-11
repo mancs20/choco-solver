@@ -11,13 +11,13 @@ public class ParetoArchive {
     private final List<Solution> paretoSolutions;
 
     private final IntVar[] objectives;
-    private int[] lastAddedSolutionObjValues;
+    private boolean canAddSolution;
 
     public ParetoArchive(IntVar[] objectives) {
-        this.objectives = objectives.clone();
+        this.objectives = objectives;
         this.paretoFront = new ArrayList<>();
         this.paretoSolutions = new ArrayList<>();
-        lastAddedSolutionObjValues = null;
+        canAddSolution = true;
     }
 
     public List<Solution> getParetoFrontSolutions() {
@@ -28,16 +28,13 @@ public class ParetoArchive {
     }
 
     public void add(Solution solution, boolean checkDominanceWhenAdding) {
-        if (solution != null) {
+        if (solution != null && canAddSolution) {
             if (checkDominanceWhenAdding) {
                 add(solution);
             } else {
-                int[] vals = new int[objectives.length];
-                if(differentFromLast(vals, solution)){
-                    lastAddedSolutionObjValues = vals;
-                    paretoSolutions.add(solution);
-                    paretoFront.add(vals);
-                }
+                int[] vals = getSolutionObjVals(solution);
+                paretoSolutions.add(solution);
+                paretoFront.add(vals);
             }
         }
     }
@@ -50,25 +47,30 @@ public class ParetoArchive {
      */
     public void add(Solution solution) {
         int isDominated = -1;
-        if (solution != null) {
-            int[] vals = new int[objectives.length];
-            if (differentFromLast(vals, solution)) {
-                for (int i = paretoSolutions.size() - 1; i >= 0; i--) {
-                    isDominated = firstIsDominatedBySecond(paretoFront.get(i), vals);
-                    if (isDominated > 0) {
-                        paretoSolutions.remove(i);
-                        paretoFront.remove(i);
-                    } else if (isDominated == 0) {
-                        break;
-                    }
+        if (solution != null && canAddSolution) {
+            int[] vals = getSolutionObjVals(solution);
+            for (int i = paretoSolutions.size() - 1; i >= 0; i--) {
+                isDominated = firstIsDominatedBySecond(paretoFront.get(i), vals);
+                if (isDominated > 0) {
+                    paretoSolutions.remove(i);
+                    paretoFront.remove(i);
+                } else if (isDominated == 0) {
+                    break;
                 }
-                if (isDominated != 0) {
-                    paretoSolutions.add(solution);
-                    paretoFront.add(vals);
-                }
-                lastAddedSolutionObjValues = vals;
+            }
+            if (isDominated != 0) {
+                paretoSolutions.add(solution);
+                paretoFront.add(vals);
             }
         }
+    }
+
+    private int[] getSolutionObjVals (Solution solution) {
+        int[] vals = new int[objectives.length];
+        for (int i = 0; i < objectives.length; i++) {
+            vals[i] = solution.getIntVal(objectives[i]);
+        }
+        return vals;
     }
 
     public int firstIsDominatedBySecond(int[] archiveSolution, int[] vals) {
@@ -84,21 +86,6 @@ public class ParetoArchive {
         return delta;
     }
 
-    private boolean differentFromLast(int[] vals, Solution solution) {
-        boolean equalToLast = true;
-        for (int i = 0; i < objectives.length; i++) {
-            vals[i] = solution.getIntVal(objectives[i]);
-            if (lastAddedSolutionObjValues == null || vals[i] != lastAddedSolutionObjValues[i]) {
-                equalToLast = false;
-            }
-        }
-        return !equalToLast;
-    }
-
-    public void clear() {
-        paretoSolutions.clear();
-    }
-
     public boolean isEmpty() {
         return paretoSolutions.isEmpty();
     }
@@ -107,7 +94,7 @@ public class ParetoArchive {
         return paretoSolutions.size();
     }
 
-    public void setLastAddedSolutionObjValues(int[] lastAddedSolutionObjValues) {
-        this.lastAddedSolutionObjValues = lastAddedSolutionObjValues;
+    public void setCanAddSolution(boolean canAddSolution) {
+        this.canAddSolution = canAddSolution;
     }
 }
