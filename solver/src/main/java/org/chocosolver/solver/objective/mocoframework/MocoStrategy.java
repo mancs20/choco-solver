@@ -95,7 +95,7 @@ public class MocoStrategy {
                 List<String> recorderList = params.getRecorderList();
                 int[] ideal = params.getIdealPoint();
                 for (int i = 0; i < ideal.length; i++) {
-                    recorderList.set(i, "No solution" + recorderList.get(i));
+                    recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
                 }
             }
         }
@@ -109,12 +109,12 @@ public class MocoStrategy {
             int isDominated = -1;
             int[] valsIdeal = new int[n];
             for (int j = 0; j < n; j++) {
-                valsIdeal[i] = idealSolutions[i].getIntVal(objectives[j]);
+                valsIdeal[j] = idealSolutions[i].getIntVal(objectives[j]);
             }
             for (int j = 0; j < archive.size(); j++) {
                 isDominated = archive.firstIsDominatedBySecond(valsIdeal, archive.getParetoFrontValues().get(j));
                 if (isDominated >= 0) {
-                    recorderList.set(i, "No solution" + recorderList.get(i));
+                    recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
                     break;
                 }
             }
@@ -130,7 +130,7 @@ public class MocoStrategy {
             for (int i = archive.getParetoFrontValues().size()-2; i > -1; i--) {
                 if (archive.firstIsDominatedBySecond(lastSolutionVals, archive.getParetoFrontValues().get(i)) >= 0){
                     archive.getParetoFrontValues().remove(archive.getParetoFrontValues().size() - 1);
-                    recorderList.set(recorderList.size()-1, "No solution" + recorderList.get(recorderList.size()-1));
+                    recorderList.set(recorderList.size()-1, "Dominated solution" + recorderList.get(recorderList.size()-1));
                     break;
                 }
             }

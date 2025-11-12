@@ -79,7 +79,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
             if (!performLexicographicOptimization && (cannotUseSaugmeconObjective || objectives.length > 2)){
                 for (int i = solutions.size()-1; i > -1; i--) {
                     if (solutionKisDominatedByTheFront(solutions.get(i), solutions, i)) {
-                        recorderList.set(i, "No solution" + recorderList.get(i));
+                        recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
                         solutions.remove(i);
                     }
                 }
@@ -96,7 +96,7 @@ public class ParetoSaugmecon implements TimeoutHolder {
                         solutions.add(i, bestObjectiveValuesSolution[i]);
                     } else {
                         // if the solution is dominated by the front, remove it from the recorderList
-                        recorderList.set(i, "No solution" + recorderList.get(i));
+                        recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
                     }
                 }
                 // check if the last solution is dominated by the front
@@ -104,12 +104,12 @@ public class ParetoSaugmecon implements TimeoutHolder {
                     // if the solution is not dominated by the front, add it to the front at the end
                     solutions.remove(solutions.size()-1);
                     // if the solution is dominated by the front, remove it from the recorderList
-                    recorderList.set(recorderList.size()-1, "No solution" + recorderList.get(recorderList.size()-1));
+                    recorderList.set(recorderList.size()-1, "Dominated solution" + recorderList.get(recorderList.size()-1));
                 }
             }else{
                 // remove the elements in recorderList that were found while optimizing individual objectives
                 for (int i = 0; i < bestObjectiveValues.length; i++) {
-                    recorderList.set(i, "No solution" + recorderList.get(i));
+                    recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
                 }
             }
         }else{

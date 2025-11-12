@@ -42,8 +42,9 @@ public class SolutionFinder {
         region.postConstraints();
         boolean addIntermediateSolutions = params.isAddIntermediateSolutions();
 
-        Solution sol = new Solution(model);
-
+        long pre = model.getSolver().getSolutionCount();
+        // recycle a solution from the pool of dominated solutions
+        Solution sol = archive.borrowDominatedSolutionFromPool();
         if (params.isOptimization()) {
             optimizeObjectiveFunction(model, sol, archive, addIntermediateSolutions);
         } else if (params.isLexicographicOptimization()) {
@@ -55,6 +56,7 @@ public class SolutionFinder {
                 model.getSolver().removeStopCriterion(stop);
             }
         }
+        boolean foundSolution = model.getSolver().getSolutionCount() > pre;
 
         if (model.getSolver().getSearchState() == STOPPED) {
             params.setExhaustive(false);
@@ -74,15 +76,17 @@ public class SolutionFinder {
         }
 
         region.unpostConstraints(model);
-        return sol.exists() ? sol : null;
+        if (foundSolution) return sol;
+        archive.returnDominatedSolutionToPool(sol);
+        return null;
     }
 
     private void optimizeObjectiveFunction(Model model, Solution sol, ParetoArchive archive, boolean addIntermediateSolutions) {
         while (model.getSolver().solve()) {
-            sol.record();
             if (addIntermediateSolutions) {
-                archive.add(sol);
+                archive.addIntermediateSolutions();
             }
+            sol.record();
         }
     }
 
@@ -101,10 +105,10 @@ public class SolutionFinder {
         }
         // 2. try to find a first solution
         while (model.getSolver().solve()) {
-            sol.record();
             if (addIntermediateSolutions) {
-                archive.add(sol);
+                archive.addIntermediateSolutions();
             }
+            sol.record();
             // todo add a flag to params to indicate verbose and then use recorder. It is to show at every second
             //  the current archive
 //                recorder.onNewSolution(sol, objectives);

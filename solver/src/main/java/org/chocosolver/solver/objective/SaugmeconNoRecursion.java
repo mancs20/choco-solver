@@ -249,7 +249,7 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
             }
         } else {
             for (int i = 0; i < objectives.length; i++) {
-                recorderList.set(i, "No solution" + recorderList.get(i));
+                recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
             }
         }
         for (int i = 0; i < bestObjectiveValues.length; i++) {
@@ -429,14 +429,14 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
             if (!solutionKisDominatedByTheFront(bestObjectiveValuesSolution[i], solutions, -1)) {
                 solutions.add(i, bestObjectiveValuesSolution[i]);
             } else {
-                recorderList.set(i, "No solution" + recorderList.get(i));
+                recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
             }
         }
     }
     private void removeLastSolutionIfDominated(){
         if (solutionKisDominatedByTheFront(solutions.get(solutions.size()-1), solutions, solutions.size()-1)) {
             solutions.remove(solutions.size()-1);
-            recorderList.set(recorderList.size()-1, "No solution" + recorderList.get(recorderList.size()-1));
+            recorderList.set(recorderList.size()-1, "Dominated solution" + recorderList.get(recorderList.size()-1));
         }
     }
 

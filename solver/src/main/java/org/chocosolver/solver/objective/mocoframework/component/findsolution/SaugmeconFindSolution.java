@@ -36,11 +36,12 @@ public class SaugmeconFindSolution extends AbstractFindSolutionStrategy{
                 solutionObjectiveValues[i] = solution.getIntVal(objectives[i]);
             }
             String solutionString = Arrays.toString(solutionObjectiveValues);
-            if (previousSolutions.contains(solutionString)) {
-                archive.setCanAddSolution(false);
-            } else {
+            archive.setCanAddSolution(false);
+            if (!previousSolutions.contains(solutionString)) {
                 previousSolutions.add(solutionString);
-                archive.setCanAddSolution(true);
+                if (!params.isAddIntermediateSolutions()) {
+                    archive.setCanAddSolution(true);
+                }
             }
             saveSolutionInformation(epsilonArr, solutionObjectiveValues,  previousSolutionInformation, solution);
         }

@@ -1,5 +1,6 @@
 package org.chocosolver.solver.objective.mocoframework.structure;
 
+import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.variables.IntVar;
 
@@ -12,12 +13,16 @@ public class ParetoArchive {
 
     private final IntVar[] objectives;
     private boolean canAddSolution;
+    // Allow to recycle (dominated) Solution objects
+    private final List<Solution> poolSols = new ArrayList<>();
+    private final Model model;
 
     public ParetoArchive(IntVar[] objectives) {
         this.objectives = objectives;
         this.paretoFront = new ArrayList<>();
         this.paretoSolutions = new ArrayList<>();
         canAddSolution = true;
+        model = this.objectives[0].getModel();
     }
 
     public List<Solution> getParetoFrontSolutions() {
@@ -33,8 +38,7 @@ public class ParetoArchive {
                 add(solution);
             } else {
                 int[] vals = getSolutionObjVals(solution);
-                paretoSolutions.add(solution);
-                paretoFront.add(vals);
+                addSolutionToArchive(solution, vals);
             }
         }
     }
@@ -46,26 +50,64 @@ public class ParetoArchive {
      * @param solution the candidate solution vector (int[] of objective values)
      */
     public void add(Solution solution) {
-        int isDominated = -1;
         if (solution != null && canAddSolution) {
             int[] vals = getSolutionObjVals(solution);
-            for (int i = paretoSolutions.size() - 1; i >= 0; i--) {
-                isDominated = firstIsDominatedBySecond(paretoFront.get(i), vals);
-                if (isDominated > 0) {
-                    paretoSolutions.remove(i);
-                    paretoFront.remove(i);
-                } else if (isDominated == 0) {
-                    break;
-                }
-            }
-            if (isDominated != 0) {
-                paretoSolutions.add(solution);
-                paretoFront.add(vals);
+            if (noSimilarSolutionInArchive(vals)) {
+                addSolutionToArchive(solution, vals);
             }
         }
     }
 
-    private int[] getSolutionObjVals (Solution solution) {
+    /**
+     * Add a new solution to the archive. It removes all solutions that are dominated
+     * by the new one.
+     *
+     */
+    public void addIntermediateSolutions() {
+        int[] vals = getSolutionObjVals();
+        if (noSimilarSolutionInArchive(vals)) {
+            Solution solution;
+            if (poolSols.isEmpty()) {
+                solution = new Solution(model);
+            } else {
+                solution = poolSols.remove(poolSols.size() - 1);
+            }
+            solution.record();
+            addSolutionToArchive(solution, vals);
+        }
+    }
+
+    private boolean noSimilarSolutionInArchive(int[] vals) {
+        int archiveSolIsDominated;
+        boolean noSimilarSolution = true;
+        for (int i = paretoSolutions.size() - 1; i >= 0; i--) {
+            archiveSolIsDominated = firstIsDominatedBySecond(paretoFront.get(i), vals);
+            if (archiveSolIsDominated > 0) {
+                poolSols.add(paretoSolutions.remove(i));
+                paretoFront.remove(i);
+            } else if (archiveSolIsDominated == 0) {
+                // is equal to a solution already in the archive
+                noSimilarSolution = false;
+                break;
+            }
+        }
+        return noSimilarSolution;
+    }
+
+    private void addSolutionToArchive(Solution solution, int[] vals) {
+        paretoSolutions.add(solution);
+        paretoFront.add(vals);
+    }
+
+    public int[] getSolutionObjVals () {
+        int[] vals = new int[objectives.length];
+        for (int i = 0; i < objectives.length; i++) {
+            vals[i] = objectives[i].getValue();
+        }
+        return vals;
+    }
+
+    public int[] getSolutionObjVals (Solution solution) {
         int[] vals = new int[objectives.length];
         for (int i = 0; i < objectives.length; i++) {
             vals[i] = solution.getIntVal(objectives[i]);
@@ -96,5 +138,18 @@ public class ParetoArchive {
 
     public void setCanAddSolution(boolean canAddSolution) {
         this.canAddSolution = canAddSolution;
+    }
+
+    public Solution borrowDominatedSolutionFromPool() {
+        if (poolSols.isEmpty()) {
+            return new Solution(model);
+        }
+        // take from the end (cheaper remove)
+        return poolSols.remove(poolSols.size() - 1);
+    }
+
+    public void returnDominatedSolutionToPool(Solution s) {
+        // caller guarantees 's' is not stored in paretoSolutions
+        poolSols.add(s);
     }
 }

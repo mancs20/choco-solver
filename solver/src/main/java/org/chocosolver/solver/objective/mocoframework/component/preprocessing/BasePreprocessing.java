@@ -32,6 +32,11 @@ public abstract class BasePreprocessing implements PreprocessingStrategy {
             objectiveFunctionInParamsArg = false;
         }
 
+        boolean addIntermediateSolutions = params.isAddIntermediateSolutions();
+        if (addIntermediateSolutions) {
+            params.setAddIntermediateSolutions(false);
+        }
+
         Model model = objectives[0].getModel();
         for (int i = 0; i < n; i++) {
             if (excludedObjectivesId.contains(i)) {
@@ -39,7 +44,7 @@ public abstract class BasePreprocessing implements PreprocessingStrategy {
             }
             IntVar objective = objectives[i];
             model.setObjective(true, objective);
-            Solution sol = optimizer.find(model, archive, objectives, dummyRegion, params, stop);
+            Solution sol = optimizer.find(model, archive, objectives, dummyRegion, params, stop).copySolution();
             if (sol != null) {
                 idealSolutions.add(sol);
                 idealValues.add(sol.getIntVal(objectives[i]));
@@ -61,6 +66,12 @@ public abstract class BasePreprocessing implements PreprocessingStrategy {
         params.setIdealSolutions(idealSolutions.toArray(new Solution[0]));
         if (!objectiveFunctionInParamsArg) {
             params.setUseOptimization(false);
+        }
+        if (addIntermediateSolutions) {
+            for (Solution sol : idealSolutions) {
+                archive.add(sol);
+            }
+            params.setAddIntermediateSolutions(true);
         }
         return idealValues.stream().mapToInt(Integer::intValue).toArray();
     }

@@ -237,6 +237,25 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
                 );
+            case "SaugmeconGlobal":
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        List.of(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON),
+                                strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI)),
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
+                );
+            case "SaugmeconGlobalIntermediate":
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        List.of(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON),
+                                strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
+                                strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS)),
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
+                );
 //            case "GIA":
 //            case "SimpleOptGlobalConstraint":
 //                return new StrategyComponents(

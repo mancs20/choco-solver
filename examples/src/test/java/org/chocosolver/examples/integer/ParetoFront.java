@@ -62,17 +62,18 @@ public class ParetoFront {
 	@DataProvider(name = "methods")
 	public Object[][] methods() {
 		return new Object[][]{
-				{"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}
+				{"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}, {"SimpleOptGlobalConstraintTest"}
+//				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}
 //				{"SaugmeconNoRTest"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
 //				{"Gavanelli"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
-//				{"ParetoDisjunctive"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
+//				{"ParetoDisjunctiveProgrammingTest"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
 		};
 	}
 
 	@DataProvider(name = "methodsMaximize")
 	public Object[][] methodsMaximize() {
 		return new Object[][]{
-				{"SimpleOptGlobalConstraintTest"}, {"Saugmecon"}, {"ParetoDisjunctive"}
+				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"SimpleOptGlobalConstraintTest"}, {"Saugmecon"}, {"ParetoDisjunctiveProgrammingTest"}
 		};
 	}
 
@@ -86,7 +87,7 @@ public class ParetoFront {
 	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
 	public Object[][] methodsOptimizeObjectivesIndividually() {
 		return new Object[][]{
-				{"Saugmecon"},{"SaugmeconNoRTest"}, {"ParetoDisjunctive"}
+				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"},{"Saugmecon"},{"SaugmeconNoRTest"}, {"ParetoDisjunctiveProgrammingTest"}
 		};
 	}
 

@@ -868,13 +868,13 @@ public interface IResolutionHelper extends ISelf<Solver> {
                     paretoSolutions.add(i, solutionsB.get(i));
                 } else {
                     // if the solution is dominated by the front, remove it from the recorderList
-                    recorderList.set(i, "No solution" + recorderList.get(i));
+                    recorderList.set(i, "Dominated solution" + recorderList.get(i));
                 }
             }
         } else {
             // remove the elements in recorderList that were found while optimizing individual objectives
             for (int i = 0; i < solutionsB.size(); i++) {
-                recorderList.set(i, "No solution" + recorderList.get(i));
+                recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
             }
         }
 
