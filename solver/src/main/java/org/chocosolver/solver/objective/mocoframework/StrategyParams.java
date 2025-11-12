@@ -2,6 +2,7 @@ package org.chocosolver.solver.objective.mocoframework;
 
 import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.constraints.Constraint;
+import org.chocosolver.solver.objective.ParetoMaximizer;
 import org.chocosolver.solver.objective.mocoframework.component.findsolution.SolutionEpsilonArrayInformation;
 
 import java.util.*;
@@ -32,6 +33,9 @@ public class StrategyParams {
     private int[] relativeWorstValue;
     private Set<String> previousSolutions = new HashSet<>();
     private List<SolutionEpsilonArrayInformation> previousSolutionInfo = new ArrayList<>();
+
+    // ────────────── Gavanelli-Specific Parameters ──────────────
+    private ParetoMaximizer paretoMaximizer;
 
     // ────────────── Getters and Setters ──────────────
 
@@ -87,10 +91,6 @@ public class StrategyParams {
 
     public boolean isLexicographicOptimization() {
         return useLexicographicOptimization;
-    }
-
-    public void setUseLexicographicOptimization(boolean value) {
-        this.useLexicographicOptimization = value;
     }
 
     public List<String> getRecorderList() {
@@ -151,15 +151,15 @@ public class StrategyParams {
         return previousSolutions;
     }
 
-    public void setPreviousSolutions(Set<String> previousSolutions) {
-        this.previousSolutions = previousSolutions;
-    }
-
     public List<SolutionEpsilonArrayInformation> getPreviousSolutionInfo() {
         return previousSolutionInfo;
     }
 
-    public void setPreviousSolutionInfo(List<SolutionEpsilonArrayInformation> previousSolutionInfo) {
-        this.previousSolutionInfo = previousSolutionInfo;
+    public ParetoMaximizer getParetoMaximizer() {
+        return paretoMaximizer;
+    }
+
+    public void setParetoMaximizer(ParetoMaximizer paretoMaximizer) {
+        this.paretoMaximizer = paretoMaximizer;
     }
 }

@@ -21,5 +21,6 @@ public class GavanelliPrepro implements PreprocessingStrategy {
         pareto.setSharedFront(paretoArchive.getParetoFrontSolutions(), paretoArchive.getParetoFrontValues());
         Constraint paretoGlobal = new Constraint("ParetoGlobal", pareto);
         paretoGlobal.post();
+        params.setParetoMaximizer(pareto);
     }
 }

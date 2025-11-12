@@ -11,7 +11,6 @@ import org.chocosolver.solver.objective.mocoframework.StrategyComponents;
 import org.chocosolver.solver.objective.mocoframework.StrategyFactory;
 import org.chocosolver.solver.objective.mocoframework.enums.*;
 import org.chocosolver.solver.objective.mocoframework.structure.ParetoSolutionDetails;
-import org.chocosolver.solver.objective.mocoframework.util.SolutionFinder;
 import org.chocosolver.solver.search.limits.TimeCounter;
 import org.chocosolver.solver.variables.IntVar;
 
@@ -429,7 +428,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
         // Initialize sums
         long totalSolutions = 0, totalNodes = 0, totalBacktracks = 0, totalBackjumps = 0, totalFails = 0,
                 totalRestarts = 0, totalPropagations = 0;
-        double totalBuildingTime = 0, totalResolutionTime = 0, averageNodePerSecond = 0;
+        double totalBuildingTime = 0, totalResolutionTime = 0, averageNodePerSecond = 0, paretoPropTime = 0;
         long count = 0; // For calculating averages
 
         if (cumulativeStats) {
@@ -438,6 +437,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 totalSolutions = stats.getSolutions();
                 totalBuildingTime = stats.getBuildingTime();
                 totalResolutionTime = stats.getResolutionTime();
+                paretoPropTime = stats.getParetoPropagationTime();
                 totalNodes = stats.getNodes();
                 averageNodePerSecond = stats.getNodePerSecond();
                 totalBacktracks = stats.getBacktracks();
@@ -453,6 +453,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                     totalSolutions += stats.getSolutions();
                     totalBuildingTime = stats.getBuildingTime(); // Assuming building time is overwritten
                     totalResolutionTime += stats.getResolutionTime();
+                    paretoPropTime += stats.getParetoPropagationTime();
                     totalNodes += stats.getNodes();
                     averageNodePerSecond += stats.getNodePerSecond();
                     totalBacktracks += stats.getBacktracks();
@@ -471,6 +472,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
         orderedMap.put("exhaustive", exhaustive);
         orderedMap.put("time(s)", totalTime);
         orderedMap.put("sum_solutions_resolution_time(s)", totalResolutionTime);
+        orderedMap.put("pareto_propagation_time(s)", paretoPropTime);
         orderedMap.put("sum_solutions_building_time(s)", totalBuildingTime);
         orderedMap.put("sum_number_solutions", totalSolutions);
         orderedMap.put("sum_solutions_nodes", totalNodes);
@@ -487,6 +489,7 @@ class SolverStats {
     private final long solutions;
     private final double buildingTime;
     private final double resolutionTime;
+    private final double paretoPropTime;
     private final long nodes;
     private final double nodePerSecond;
     private final long backtracks;
@@ -507,14 +510,18 @@ class SolverStats {
             + "Backjumps: ([\\d,]+)\\s+"
             + "Fails: ([\\d,]+)\\s+"
             + "Restarts: ([\\d,]+)\\s+"
-            + "Propagations: ([\\d,]+)", Pattern.DOTALL);
+            + "Propagations: ([\\d,]+)"
+            + "(?:\\s+Time Pareto prop\\s*:\\s*([\\d.,]+)s\\s*)?"
+            , Pattern.DOTALL);
+
 
     // Constructor
     private SolverStats(long solutions, double buildingTime, double resolutionTime, long nodes, double nodePerSecond,
-                        long backtracks, long backjumps, long fails, long restarts, long propagations) {
+                        long backtracks, long backjumps, long fails, long restarts, long propagations, double paretoPropTime) {
         this.solutions = solutions;
         this.buildingTime = buildingTime;
         this.resolutionTime = resolutionTime;
+        this.paretoPropTime = paretoPropTime;
         this.nodes = nodes;
         this.nodePerSecond = nodePerSecond;
         this.backtracks = backtracks;
@@ -528,6 +535,8 @@ class SolverStats {
     public static SolverStats parse(String statString) {
         Matcher matcher = PATTERN.matcher(statString);
         if (matcher.find()) {
+            String paretoPropStr = matcher.group(11);
+            double paretoProp = paretoPropStr != null ? parseFloatRemoveComma(paretoPropStr) : 0.0;
             return new SolverStats(
                     Long.parseLong(matcher.group(1).replace(",", "")),
                     parseFloatRemoveComma(matcher.group(2)),
@@ -538,9 +547,11 @@ class SolverStats {
                     Long.parseLong(matcher.group(7).replace(",", "")),
                     Long.parseLong(matcher.group(8).replace(",", "")),
                     Long.parseLong(matcher.group(9).replace(",", "")),
-                    Long.parseLong(matcher.group(10).replace(",", ""))
+                    Long.parseLong(matcher.group(10).replace(",", "")),
+                    paretoProp // This will be null if the group is absent
             );
         }
+
         return null;
     }
 
@@ -552,6 +563,7 @@ class SolverStats {
     public long getSolutions() { return solutions; }
     public double getBuildingTime() { return buildingTime; }
     public double getResolutionTime() { return resolutionTime; }
+    public double getParetoPropagationTime() { return paretoPropTime; } // Placeholder if needed
     public long getNodes() { return nodes; }
     public double getNodePerSecond() { return nodePerSecond; }
     public long getBacktracks() { return backtracks; }

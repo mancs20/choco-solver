@@ -80,6 +80,12 @@ public class MocoStrategy {
         if (recorderList.size() == 0) {
             recorderList.add(model.getSolver().getMeasures().toString());
         }
+        if (params.getParetoMaximizer() != null) {
+            String addGavanelli = recorderList.get(0);
+            float gavanelliTime = params.getParetoMaximizer().timeFindingTightestPoint / (1000 * 1000 * 1000f);
+            addGavanelli +=  String.format("\n\tTime Pareto prop : %.3fs", gavanelliTime);
+            recorderList.set(0, addGavanelli);
+        }
         removeIdealSolution(archive, params, objectives);
         model.getSolver().removeStopCriterion(stop);
         return new ParetoSolutionDetails(archive.getParetoFrontSolutions(), recorderList, params.isExhaustive());
