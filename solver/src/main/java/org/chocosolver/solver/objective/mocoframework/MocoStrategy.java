@@ -117,7 +117,7 @@ public class MocoStrategy {
             for (int j = 0; j < n; j++) {
                 valsIdeal[j] = idealSolutions[i].getIntVal(objectives[j]);
             }
-            for (int j = 0; j < archive.size(); j++) {
+            for (int j = 0; j < archive.getParetoFrontValues().size(); j++) {
                 isDominated = archive.firstIsDominatedBySecond(valsIdeal, archive.getParetoFrontValues().get(j));
                 if (isDominated >= 0) {
                     recorderList.set(i, "Preprocessing solution" + recorderList.get(i));

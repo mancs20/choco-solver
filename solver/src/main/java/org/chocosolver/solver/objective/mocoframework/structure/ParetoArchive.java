@@ -132,10 +132,6 @@ public class ParetoArchive {
         return paretoSolutions.isEmpty();
     }
 
-    public int size() {
-        return paretoSolutions.size();
-    }
-
     public void setCanAddSolution(boolean canAddSolution) {
         this.canAddSolution = canAddSolution;
     }
