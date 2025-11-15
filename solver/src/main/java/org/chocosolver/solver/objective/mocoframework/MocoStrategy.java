@@ -108,27 +108,38 @@ public class MocoStrategy {
     }
 
     private void addBestObjetiveValuesAsSolutionIfNotDomanited(ParetoArchive archive, StrategyParams params, IntVar[] objectives){
-        int n = archive.getParetoFrontValues().get(0).length;
         Solution[] idealSolutions = params.getIdealSolutions();
-        List<String> recorderList = params.getRecorderList();
-        for (int i = 0; i < idealSolutions.length; i++) {
-            int isDominated = -1;
-            int[] valsIdeal = new int[n];
-            for (int j = 0; j < n; j++) {
-                valsIdeal[j] = idealSolutions[i].getIntVal(objectives[j]);
-            }
-            for (int j = 0; j < archive.getParetoFrontValues().size(); j++) {
-                isDominated = archive.firstIsDominatedBySecond(valsIdeal, archive.getParetoFrontValues().get(j));
-                if (isDominated >= 0) {
-                    recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
-                    break;
+        if (!archive.getParetoFrontValues().isEmpty()) {
+            List<String> recorderList = params.getRecorderList();
+            int n = archive.getParetoFrontValues().get(0).length;
+            for (int i = 0; i < idealSolutions.length; i++) {
+                int isDominated = -1;
+                int[] valsIdeal = new int[n];
+                if (idealSolutions[i] == null) continue;
+                for (int j = 0; j < n; j++) {
+                    valsIdeal[j] = idealSolutions[i].getIntVal(objectives[j]);
+                }
+                for (int j = 0; j < archive.getParetoFrontValues().size(); j++) {
+                    isDominated = archive.firstIsDominatedBySecond(valsIdeal, archive.getParetoFrontValues().get(j));
+                    if (isDominated >= 0) {
+                        recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
+                        break;
+                    }
+                }
+                if (isDominated < 0) {
+                    archive.getParetoFrontSolutions().add(i, idealSolutions[i]);
                 }
             }
-            if (isDominated < 0) {
-                archive.getParetoFrontSolutions().add(i, idealSolutions[i]);
+        } else {
+            for (int i = 0; i < idealSolutions.length; i++) {
+                if (idealSolutions[i] != null) {
+                    archive.getParetoFrontSolutions().add(i, idealSolutions[i]);
+                    archive.getParetoFrontValues().add(i, archive.getSolutionObjVals(idealSolutions[i]));
+                }
             }
         }
     }
+
     private void removeLastSolutionIfDominated(StrategyParams params, ParetoArchive archive){
         if (!params.isCheckIfNewSolutionDominates() && !params.isAddIntermediateSolutions()) {
             int[] lastSolutionVals = archive.getParetoFrontValues().get(archive.getParetoFrontValues().size() - 1);

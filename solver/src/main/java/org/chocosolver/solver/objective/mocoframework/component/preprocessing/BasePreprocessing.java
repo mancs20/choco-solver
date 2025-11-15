@@ -44,8 +44,9 @@ public abstract class BasePreprocessing implements PreprocessingStrategy {
             }
             IntVar objective = objectives[i];
             model.setObjective(true, objective);
-            Solution sol = optimizer.find(model, archive, objectives, dummyRegion, params, stop).copySolution();
-            if (sol != null) {
+            Solution opt = optimizer.find(model, archive, objectives, dummyRegion, params, stop);
+            if (opt != null) {
+                Solution sol = opt.copySolution();
                 idealSolutions.add(sol);
                 idealValues.add(sol.getIntVal(objectives[i]));
             } else {

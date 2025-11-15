@@ -338,13 +338,14 @@ public class ParetoFront {
 		}
 	}
 
-	@Test(dataProvider = "methodsOptimizeObjectivesIndividually", groups = "5s", timeOut = 300_000)
+	@Test(dataProvider = "methodsOptimizeObjectivesIndividually", groups = "15s", timeOut = 15_000)
 	public void testParetoMethodsWhenTimeoutReachedAfterIndividualOptimalValues(String method) throws Exception {
-		String instanceFile = "KP_p-2_n-50_ins-14.dat";
-		int timeoutSec = 5;
-		JSONArray pfJson = runAndCollectPFStringsMOOLibraryKP(method, instanceFile, timeoutSec);
-		System.out.println("Method " + method + " found " + pfJson.length() + " non-dominated solutions.");
-		pfJsonToSet(pfJson, method);
+		String instanceFile = "lagos_nigeria_100_cost_clouds_angle.fzn";
+		int timeoutSec = 1;
+		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "fzn_instance");
+		assertFalse(rr.wasExhaustive());
+		assertEquals(rr.solutionsDetails.getJSONArray("pareto_front").length(), 1);
+		System.out.println(rr.stdout);
 	}
 
 	private JSONArray runAndCollectPFStringsNqueens(String paretoMethod, String instanceFile, int timeoutSec) throws Exception {

@@ -37,12 +37,24 @@ public class SaugmeconPreprocessing extends BasePreprocessing {
         params.setRwv(idealValues.clone());
         params.setCheckIfNewSolutionDominates(false);
 
-        Constraint objectiveFunction = setSaugmeconObjective(model, objectives);
+        Constraint objectiveFunction = null;
+        if(validateIdealNadir(idealValues, nadirValues)){
+            objectiveFunction = setSaugmeconObjective(model, objectives);
+        }
         if (objectiveFunction != null) {
             params.setObjectiveFunction(objectiveFunction);
         } else {
             params.setLexicographicOptimizationOrder(objOrder);
         }
+    }
+
+    private boolean validateIdealNadir(int[] idealValues, int[] nadirValues) {
+        for (int i = 0; i < idealValues.length; i++) {
+            if (idealValues[i] <= nadirValues[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private int[] getObjectivesOrder(IntVar[] objectives) {
@@ -92,6 +104,11 @@ public class SaugmeconPreprocessing extends BasePreprocessing {
             int[] range = new int[idealValues.length];
             for (int i = 0; i < idealValues.length; i++) {
                 range[i] = Math.abs(idealValues[i] - nadirValues[i]);
+                if (range[i] == 0) {
+                    // cannot use saugmecon objective as one of the ranges is 0
+                    cannotUseSaugmeconObjective = true;
+                    break;
+                }
             }
             int rangeMultiplier = 0;
             long lcmValue = lcm(range);
