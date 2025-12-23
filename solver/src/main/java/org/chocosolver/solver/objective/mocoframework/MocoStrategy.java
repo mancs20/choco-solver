@@ -5,6 +5,7 @@ import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 
 import org.chocosolver.solver.constraints.Constraint;
+import org.chocosolver.solver.objective.ParetoMaximizer;
 import org.chocosolver.solver.objective.mocoframework.component.findsolution.FindNonDominatedSolutionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.initialregion.InitialRegionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.objectivefunction.ObjectiveFunctionStrategy;
@@ -59,7 +60,7 @@ public class MocoStrategy {
             step.apply(model, objectives, archive, params, stop);
         }
         // objective function if any
-        if (params.getObjectiveFunction() != null && !params.isLexicographicOptimization()) {
+        if (objectiveFunction != null && !params.isLexicographicOptimization()) {
             IntVar objVar = objectiveFunction.define(model, objectives, params);
             if (objVar != null) {
                 model.setObjective(Model.MAXIMIZE, objVar);
@@ -69,13 +70,21 @@ public class MocoStrategy {
         }
 
         boolean checkDominanceWhenAdding;
+        long solvingTime = 0L;
+        long updatingTime = 0L;
         while (!regionConstraints.isEmpty() && !model.getSolver().isStopCriterionMet()) {
             Region region = selectRegion.select(regionConstraints);
+            long startSolving = System.nanoTime();
             Solution s = findSolution.find(model, archive, objectives, region, params, stop);
+            solvingTime += System.nanoTime() - startSolving;
             checkDominanceWhenAdding = params.isAddIntermediateSolutions() || params.isCheckIfNewSolutionDominates();
             archive.add(s, checkDominanceWhenAdding);
+            long startUpdating = System.nanoTime();
             updateRegions.update(regionConstraints, archive, objectives, s, params);
+            updatingTime += System.nanoTime() - startUpdating;
         }
+        System.out.println(String.format("Total solving time: %.3fs", solvingTime / (1000f * 1000f * 1000f)));
+        System.out.println(String.format("Total updating time: %.3fs", updatingTime / (1000f * 1000f * 1000f)));
         List<String> recorderList = params.getRecorderList();
         if (recorderList.size() == 0) {
             recorderList.add(model.getSolver().getMeasures().toString());
@@ -85,6 +94,7 @@ public class MocoStrategy {
             float gavanelliTime = params.getParetoMaximizer().timeFindingTightestPoint / (1000 * 1000 * 1000f);
             addGavanelli +=  String.format("\n\tTime Pareto prop : %.3fs", gavanelliTime);
             recorderList.set(0, addGavanelli);
+            System.out.println("Number of times the same non-dominated point in the objective space was reached in the global constraint: " + params.getParetoMaximizer().sameSolutionReached);
         }
         removeIdealSolution(archive, params, objectives);
         model.getSolver().removeStopCriterion(stop);

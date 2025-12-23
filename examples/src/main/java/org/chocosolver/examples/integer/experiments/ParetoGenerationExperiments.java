@@ -94,7 +94,6 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
         IntVar[] objectives = modelAndObjectives.getObjectives();
         Object[] decisionVariables = modelAndObjectives.getDecisionVariables();
         boolean maximization = modelAndObjectives.isMaximization();
-
         ParetoObjective[] originalObjectives = new ParetoObjective[objectives.length];
         for (int i = 0; i < objectives.length; i++) {
             originalObjectives[i] = new ParetoObjective(objectives[i].getLB(), objectives[i].getUB());
@@ -105,6 +104,10 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
         boolean exhaustive = true;
         if (portfolioSize == 1) {
             Model model = modelAndObjectives.getModel();
+            if (decisionVariables != null && decisionVariables.length > 0) {
+                model.addHook("decisionVariables", decisionVariables);
+            }
+            model.addHook("objectives", objectives);
             IMultiObjectiveManager.setDefaultSearchMultiObjective(model, objectives, modelAndObjectives.getDecisionVariablesSearch());
             results = runFrontStrategy(model, objectives, frontGenerator, maximization, config.getSolverTimeoutSec());
             if (model.getSolver().isStopCriterionMet()){
@@ -224,6 +227,27 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
                         List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI)),
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.GENERIC),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
+                );
+            case "SimpleOptGlobalConstraint":
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
+                                strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS)),
+                        strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.GENERIC),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
+                );
+            case "SimpleOptGlobalConstraintNoGoodSolution":
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
+                                strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS),
+                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_INTERMEDIATE_SOLUTIONS)),
+                        strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.GENERIC),
                         strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)

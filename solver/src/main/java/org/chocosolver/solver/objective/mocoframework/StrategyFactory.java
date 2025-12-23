@@ -41,6 +41,9 @@ public class StrategyFactory {
             case ADD_INTERMEDIATE_SOLUTIONS:
                 strategy = new AddIntermediateSolutionsPreprocessing();
                 break;
+            case NO_GOOD_ON_INTERMEDIATE_SOLUTIONS:
+                strategy = new NoGoodOnIntermediateSolution();
+                break;
             default:
                 throw new IllegalArgumentException("Unknown PreprocessingType: " + type);
         }

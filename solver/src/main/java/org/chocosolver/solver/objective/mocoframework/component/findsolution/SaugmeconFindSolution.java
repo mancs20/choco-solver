@@ -43,7 +43,9 @@ public class SaugmeconFindSolution extends AbstractFindSolutionStrategy{
                     archive.setCanAddSolution(true);
                 }
             }
-            saveSolutionInformation(epsilonArr, solutionObjectiveValues,  previousSolutionInformation, solution);
+            if (params.getParetoMaximizer() == null) {
+                saveSolutionInformation(epsilonArr, solutionObjectiveValues,  previousSolutionInformation, solution);
+            }
         }
 
         return solution;
