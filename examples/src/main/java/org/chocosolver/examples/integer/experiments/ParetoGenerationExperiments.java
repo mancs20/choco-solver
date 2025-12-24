@@ -184,6 +184,9 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 case "ParetoDisjunctiveProgrammingTest":
                     ParetoDisjunctiveProgramming paretoDisjunctiveProgramming = new ParetoDisjunctiveProgramming();
                     return paretoDisjunctiveProgramming.run(model, objectives, maximize, timeoutSec, true);
+                case "ParetoDisjunctiveProgrammingNoLabel":
+                    ParetoDisjunctiveNoLabel paretoDisjunctiveProgrammingNoLabel = new ParetoDisjunctiveNoLabel();
+                    return paretoDisjunctiveProgrammingNoLabel.run(model, objectives, maximize, timeoutSec);
                 case "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest":
                     Pareto pareto = new Pareto();
                     return pareto.run(model, objectives, maximize);

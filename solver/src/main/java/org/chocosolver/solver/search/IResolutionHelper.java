@@ -24,10 +24,7 @@ import org.chocosolver.solver.constraints.unary.Member;
 import org.chocosolver.solver.constraints.unary.NotMember;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
-import org.chocosolver.solver.objective.ParetoMaximizer;
-import org.chocosolver.solver.objective.ParetoMaximizerGIACoverage;
-import org.chocosolver.solver.objective.ParetoOptGavanelliConstraint;
-import org.chocosolver.solver.objective.SaugmeconNoRecursion;
+import org.chocosolver.solver.objective.*;
 import org.chocosolver.solver.search.limits.ACounter;
 import org.chocosolver.solver.search.limits.SolutionCounter;
 import org.chocosolver.solver.search.measure.IMeasures;
@@ -589,6 +586,14 @@ public interface IResolutionHelper extends ISelf<Solver> {
 //        saugmecon.setSolutions(solutions);
 
         return saugmecon;
+    }
+
+    default DisjunctiveAlgorithm findParetoFrontDisjunctive(IntVar[] objectives, boolean maximize, int timeout, Criterion... stop) {
+        // transform the problem to maximization
+        IntVar[] objectivesMax = Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new);
+        DisjunctiveAlgorithm disjunctive = new DisjunctiveAlgorithm(ref().getModel(), objectivesMax, timeout);
+        disjunctive.findParetoFront();
+        return disjunctive;
     }
 
     /**
