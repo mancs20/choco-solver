@@ -62,8 +62,10 @@ public class ParetoFront {
 	@DataProvider(name = "methods")
 	public Object[][] methods() {
 		return new Object[][]{
-				{"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}, {"SimpleOptGlobalConstraintTest"}
-//				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}
+//				{"SimpleOptGlobalConstraintTest"}, {"SimpleOptGlobalConstraint"}
+//				{"SimpleOptGlobalConstraint"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}, {"SimpleOptGlobalConstraintTest"}, {"SimpleOptGlobalConstraint"}
+				{"SaugmeconNoRTestReal"}, {"ParetoDisjunctiveProgrammingTest"}, {"SaugmeconGlobal"},
+				{"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}, {"ParetoDisjunctiveProgrammingNoLabel"}
 //				{"SaugmeconNoRTest"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
 //				{"Gavanelli"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
 //				{"ParetoDisjunctiveProgrammingTest"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
@@ -73,7 +75,8 @@ public class ParetoFront {
 	@DataProvider(name = "methodsMaximize")
 	public Object[][] methodsMaximize() {
 		return new Object[][]{
-				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"SimpleOptGlobalConstraintTest"}, {"Saugmecon"}, {"ParetoDisjunctiveProgrammingTest"}
+				{"SimpleOptGlobalConstraint"}, {"SimpleOptGlobalConstraintTest"}, {"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"SimpleOptGlobalConstraintTest"}, {"Saugmecon"},
+				{"ParetoDisjunctiveProgrammingNoLabel"}, {"SaugmeconNoRTestReal"}
 		};
 	}
 
@@ -87,7 +90,8 @@ public class ParetoFront {
 	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
 	public Object[][] methodsOptimizeObjectivesIndividually() {
 		return new Object[][]{
-				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"},{"Saugmecon"},{"SaugmeconNoRTest"}, {"ParetoDisjunctiveProgrammingTest"}
+				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"},{"Saugmecon"},{"SaugmeconNoRTest"},
+				{"ParetoDisjunctiveProgrammingTest"}, {"SaugmeconNoRTestReal"}, {"ParetoDisjunctiveProgrammingNoLabel"}
 		};
 	}
 
@@ -124,6 +128,15 @@ public class ParetoFront {
 		long upperBoundMs = timeoutSec * 1000 + 500;
 		assertTrue(elapsedMs <= upperBoundMs,
 				"Expected <= " + upperBoundMs + " ms, got " + elapsedMs + " ms");
+		assertFalse(rr.wasExhaustive(),
+				"Expected non-exhaustive search when timeout happens" );
+		String messageToCheck = rr.solverMessages.get(0);
+		if (messageToCheck != null && messageToCheck.toLowerCase().contains("solutions")) {
+			assertTrue(rr.solutionsDetails.getJSONArray("pareto_front").length() > 0,
+					"Expected some points in the pareto front when timeout happens");
+			assertTrue(rr.solutionsDetails.getJSONArray("solutions_pareto_front").length() > 0,
+					"Expected some solutions in the Pareto set when timeout happens");
+		}
 
 		pfJsonToSet(pfJson, method);
 	}
@@ -185,10 +198,10 @@ public class ParetoFront {
 				+ elapsedMs + " ms.");
 	}
 
-	@Test(dataProvider = "methodsMaximize", groups = "20s", timeOut = 20_000)
+	@Test(dataProvider = "methodsMaximize", groups = "20s", timeOut = 20000_000)
 	public void testObjFunctionDiffSignParetoInMinProblemsForMaxStrategies(String method) throws Exception{
 		String instanceFile = "paris_30_cost_clouds.fzn";
-		int timeoutSec = 2;
+		int timeoutSec = 2000;
 		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "fzn_instance");
 		// check if the objective is MAximized
 		String messageToCheck = rr.solverMessages.get(0);

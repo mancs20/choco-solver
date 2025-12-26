@@ -5,6 +5,8 @@ import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.Solver;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.variables.IntVar;
+import org.chocosolver.solver.variables.RealVar;
+import org.chocosolver.solver.variables.Variable;
 import org.chocosolver.util.moexperiments.TimeBasedSolutionPrinter;
 import org.chocosolver.util.moexperiments.TimeoutHolder;
 
@@ -27,6 +29,7 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
     private boolean stopCriterionReached;
     private final boolean performLexicographicOptimization;
     private boolean cannotUseSaugmeconObjective;
+    private boolean useRealObjectiveFunction;
     protected int solveCallsCount;
     private final TimeBasedSolutionPrinter recorder;
     private int[] efArray;
@@ -48,10 +51,21 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         exhaustive = true;
     }
 
+    public SaugmeconNoRecursion(boolean performLexicographicOptimization, Model model, IntVar[] objectives, int timeout,
+    boolean useRealObjectiveFunction){
+        this(performLexicographicOptimization, model, objectives, timeout);
+        this.cannotUseSaugmeconObjective = !useRealObjectiveFunction;
+        this.useRealObjectiveFunction = useRealObjectiveFunction;
+    }
+
     public void initialization() {
         getObjectivesOptimalValues();
         getNadirObjectiveValues();
-        setSaugmeconObjective();
+        if (useRealObjectiveFunction) {
+            setSaugmeconObjectiveUsingReal();
+        } else {
+            setSaugmeconObjective();
+        }
 
         // initialize the epsilon array
         efArray = new int[nadirObjectiveValues.length];
@@ -128,9 +142,7 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
                     }
                 }
                 solver.removeStopCriterion();
-                if (saveStats) {
-                    recorderList.add(solver.getMeasures().toString());
-                }
+                recorderList.add(solver.getMeasures().toString());
                 if (solution == null || !solution.exists()) solution = null;
                 if (!solver.isStopCriterionMet()){
                     solver.reset();
@@ -226,6 +238,44 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         }
     }
 
+    private void setSaugmeconObjectiveUsingReal() {
+        double p = 0.01d;
+        RealVar x = model.realVar(1, 5, p);
+        RealVar y = model.realVar(1, 5, p);
+        // x / (y-2) <= 1.5
+        x.div(y.sub(2)).le(1.5).equation().post();
+
+        // calculate the range for each objective
+        double[] range = new double[bestObjectiveValues.length];
+        for (int i = 0; i < bestObjectiveValues.length; i++) {
+            range[i] = Math.abs(bestObjectiveValues[i] - nadirObjectiveValues[i]);
+        }
+        double eps = 0.001;
+
+        double[] coefficients = new double[objectives.length+1];
+        coefficients[0] = 1d;
+        for (int i = 1; i < objectives.length; i++) {
+            coefficients[i] = eps / (range[i - 1]);
+        }
+
+        double lbSaugmeconObjective = 0;
+        double ubSaugmeconObjective = 0;
+        for (int i = 0; i < objectives.length; i++) {
+            lbSaugmeconObjective += coefficients[i] * objectives[i].getLB();
+            ubSaugmeconObjective += coefficients[i] * objectives[i].getUB();
+        }
+
+        RealVar saugmeconObjective = model.realVar("saugmeconObjective", lbSaugmeconObjective,
+                ubSaugmeconObjective, 0.0000001d);
+
+        Variable[] vars = new Variable[objectives.length + 1];
+        System.arraycopy(objectives, 0, vars, 0, objectives.length);
+        vars[objectives.length] = saugmeconObjective;
+        coefficients[coefficients.length-1] = -1d;
+        model.scalar(vars, coefficients, "=", 0).post();
+        model.setObjective(true, saugmeconObjective);
+    }
+
     public List<Solution> exploreAllEpsilonValues() {
         while (!stopCriterionReached && efArray[efArray.length-1] <= bestObjectiveValues[bestObjectiveValues.length-1]){
             int[] solutionObjectiveValues = getSolutionForCurrentEpsilonValues();
@@ -244,7 +294,7 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
             if (efArray[efArray.length-1] <= bestObjectiveValues[bestObjectiveValues.length-1]) {
                 exhaustive = false;
                 System.out.println("Stop criterion reached, the Pareto front may be incomplete");
-                addBestObjetiveValuesAsSolutionIfNotDomanited();
+                addBestObjectiveValuesAsSolutionIfNotDominated();
                 removeLastSolutionIfDominated();
             }
         } else {
@@ -424,12 +474,20 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         }
     }
 
-    private void addBestObjetiveValuesAsSolutionIfNotDomanited(){
-        for (int i = 0; i < bestObjectiveValues.length; i++) {
-            if (!solutionKisDominatedByTheFront(bestObjectiveValuesSolution[i], solutions, -1)) {
-                solutions.add(i, bestObjectiveValuesSolution[i]);
-            } else {
-                recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
+    private void addBestObjectiveValuesAsSolutionIfNotDominated(){
+        if (!solutions.isEmpty()) {
+            for (int i = 0; i < bestObjectiveValues.length; i++) {
+                if (!solutionKisDominatedByTheFront(bestObjectiveValuesSolution[i], solutions, -1)) {
+                    solutions.add(i, bestObjectiveValuesSolution[i]);
+                } else {
+                    recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
+                }
+            }
+        } else {
+            for (Solution solution : bestObjectiveValuesSolution) {
+                if (solution != null) {
+                    solutions.add(solution);
+                }
             }
         }
     }

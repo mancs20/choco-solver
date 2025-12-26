@@ -196,6 +196,9 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 case "SaugmeconNoRTest":
                     ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursive = new ParetoSaugmeconNoRecursive();
                     return paretoSaugmeconNoRecursive.run(model, objectives, maximize, true, timeoutSec);
+                case "SaugmeconNoRTestReal":
+                    ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursiveReals = new ParetoSaugmeconNoRecursive();
+                    return paretoSaugmeconNoRecursiveReals.run(model, objectives, maximize, true, timeoutSec, true);
                 case "SaugmeconNoRFrontVerifyTest":
                     ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursiveFrontVerify = new ParetoSaugmeconNoRecursive();
                     return paretoSaugmeconNoRecursiveFrontVerify.run(model, objectives, maximize, false, timeoutSec);

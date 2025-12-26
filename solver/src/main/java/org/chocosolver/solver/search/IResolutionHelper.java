@@ -557,7 +557,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
      * @param stop       optional criteria to stop the search before finding all/best solution
      * @return a list that contained the solutions found.
      */
-    default SaugmeconNoRecursion findParetoFrontSaugmecon(IntVar[] objectives, boolean maximize, boolean performLexicographicOptimization, int timeout, Criterion... stop) {
+    default SaugmeconNoRecursion findParetoFrontSaugmecon(IntVar[] objectives, boolean maximize, boolean performLexicographicOptimization, int timeout, boolean useReals, Criterion... stop) {
         // todo the commented code is to choose which objective to optimize based on its range, now the objective
         //  to be optimized is the one at index 0
         // get the objective with the highest difference between max and min
@@ -572,7 +572,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
 
         // transform the problem to maximization
         IntVar[] objectivesMax = Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new);
-        SaugmeconNoRecursion saugmecon = new SaugmeconNoRecursion(performLexicographicOptimization, ref().getModel(), objectivesMax, timeout);
+        SaugmeconNoRecursion saugmecon = new SaugmeconNoRecursion(performLexicographicOptimization, ref().getModel(), objectivesMax, timeout, useReals);
         saugmecon.initialization();
         List<Solution> solutions =  saugmecon.exploreAllEpsilonValues();
         // rotate back the solutions to the original order
