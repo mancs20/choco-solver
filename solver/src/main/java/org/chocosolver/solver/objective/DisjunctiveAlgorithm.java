@@ -33,7 +33,9 @@ public class DisjunctiveAlgorithm extends ParetoAbstract implements TimeoutHolde
 
     public void findParetoFront() {
         getIdealPoint();
-        prepareObjectiveFunction();
+        if (!stopCriterionReached) {
+            prepareObjectiveFunction();
+        }
         List<Region> feasibleRegions = new ArrayList<>();
         Set<Region> infeasibleRegions = new HashSet<>();
         int[] initialRegion = new int[objectives.length];
