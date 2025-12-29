@@ -201,24 +201,26 @@ public class DisjunctiveAlgorithm extends ParetoAbstract implements TimeoutHolde
             for (int i = 0; i < bestObjectiveValues.length; i++) {
                 objectiveValuesIdealSolution[i] = solutionToObjectivesValues(bestObjectiveValuesSolution[i]);
             }
-
+            boolean isDominatedByParetoPoint = true;
+            int insertIndex = 0;
             for (int i = 0; i < objectiveValuesIdealSolution.length; i++) {
-                boolean isDominated = true;
                 for (Solution s: solutions) {
-                    int[] vals = solutionToObjectivesValues(s);
+                    int[] paretoPoint = solutionToObjectivesValues(s);
+                    isDominatedByParetoPoint = true;
                     for (int j = 0; j < objectives.length; j++) {
-                        if (vals[j] < objectiveValuesIdealSolution[i][j]) {
-                            isDominated = false;
+                        if (paretoPoint[j] < objectiveValuesIdealSolution[i][j]) {
+                            isDominatedByParetoPoint = false;
                             break;
                         }
                     }
-                    if (isDominated) {
+                    if (isDominatedByParetoPoint) {
                         recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
                         break;
                     }
                 }
-                if (!isDominated) {
-                    solutions.add(bestObjectiveValuesSolution[i]);
+                if (!isDominatedByParetoPoint) {
+                        solutions.add(insertIndex, bestObjectiveValuesSolution[i]);
+                        insertIndex++;
                 }
             }
         } else {
