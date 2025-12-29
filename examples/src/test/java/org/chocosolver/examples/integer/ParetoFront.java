@@ -73,7 +73,8 @@ public class ParetoFront {
 	@DataProvider(name = "methodsMaximize")
 	public Object[][] methodsMaximize() {
 		return new Object[][]{
-				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"SimpleOptGlobalConstraintTest"}, {"Saugmecon"}, {"ParetoDisjunctiveProgrammingTest"}
+				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"SimpleOptGlobalConstraintTest"}, {"Saugmecon"},
+				{"ParetoDisjunctiveProgrammingNoLabel"}
 		};
 	}
 
