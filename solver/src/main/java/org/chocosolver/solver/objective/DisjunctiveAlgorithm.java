@@ -154,7 +154,7 @@ public class DisjunctiveAlgorithm extends ParetoAbstract implements TimeoutHolde
         for (Region region : feasibleRegions) {
             boolean regionViolatesIdeal = false;
             for (int k = 0; k < objectives.length; k++) {
-                if (region.v[k] > bestObjectiveValues[k]) {
+                if (region.v[k] >= bestObjectiveValues[k]) {
                     regionViolatesIdeal = true;
                     break;
                 }
