@@ -100,11 +100,13 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         for (int i = 1; i < objectives.length; i++) {
             IntVar objective = objectives[i];
             model.setObjective(maximize, objective);
-            Solution solution = optimizeIntVar(maximize, searchForBestObjectivesValues, false);
+            Solution solution = optimizeIntVar(maximize, false, false);
             if (solution != null) {
                 objectivesValues[i - 1] = solution.getIntVal(objective);
                 if (searchForBestObjectivesValues) {
                     bestObjectiveValuesSolution[i - 1] = solution;
+                    // add a constraint to limit UB of the objective value
+                    model.arithm(objective, "<=", solution.getIntVal(objective)).post();
                 }
             } else {
                 break;
@@ -239,23 +241,30 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
     }
 
     private void setSaugmeconObjectiveUsingReal() {
-        double p = 0.01d;
-        RealVar x = model.realVar(1, 5, p);
-        RealVar y = model.realVar(1, 5, p);
-        // x / (y-2) <= 1.5
-        x.div(y.sub(2)).le(1.5).equation().post();
-
         // calculate the range for each objective
         double[] range = new double[bestObjectiveValues.length];
+        double maxRange = Double.NEGATIVE_INFINITY;
         for (int i = 0; i < bestObjectiveValues.length; i++) {
             range[i] = Math.abs(bestObjectiveValues[i] - nadirObjectiveValues[i]);
+            if (range[i] > maxRange) {
+                maxRange = range[i];
+            }
         }
-        double eps = 0.001;
+        double delta;
+        if (objectives.length > 2) {
+            delta = Math.nextDown(1.0d / objectives.length);
+        } else {
+            delta = Math.nextDown(1.0d / (range[0]));
+        }
 
         double[] coefficients = new double[objectives.length+1];
         coefficients[0] = 1d;
-        for (int i = 1; i < objectives.length; i++) {
-            coefficients[i] = eps / (range[i - 1]);
+        if (objectives.length > 2) {
+            for (int i = 1; i < objectives.length; i++) {
+                coefficients[i] = delta / (range[i - 1]);
+            }
+        } else {
+            coefficients[1] = delta;
         }
 
         double lbSaugmeconObjective = 0;
@@ -265,14 +274,31 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
             ubSaugmeconObjective += coefficients[i] * objectives[i].getUB();
         }
 
+        // the smallest difference between two objective values is when one objective changes by 1 and the rest remain
+        // the same. In that case, when we subtract the two saugmecon objective values, the difference is
+        // delta x (o_i+1)/range_i - delta x o_i/range_i (i is the objective that have change).
+        // delta x (o_i+1)/range_i - delta x o_i/range_i = delta/range_i >= delta/maxRange
+        // thus we can set the precision to the minimum difference 1/maxRange
+        if (maxRange <= 0d) {
+            throw new IllegalStateException("maxRange must be > 0 for SAUGMECON precision");
+        }
+        double precisionSaugmecon;
+        if (objectives.length > 2) {
+            precisionSaugmecon = Math.nextDown(delta / maxRange);
+        } else {
+            precisionSaugmecon = Math.nextDown(delta);
+        }
+
         RealVar saugmeconObjective = model.realVar("saugmeconObjective", lbSaugmeconObjective,
-                ubSaugmeconObjective, 0.0000001d);
+                ubSaugmeconObjective, precisionSaugmecon);
 
         Variable[] vars = new Variable[objectives.length + 1];
         System.arraycopy(objectives, 0, vars, 0, objectives.length);
         vars[objectives.length] = saugmeconObjective;
         coefficients[coefficients.length-1] = -1d;
         model.scalar(vars, coefficients, "=", 0).post();
+        // precision objective
+        model.setPrecision(precisionSaugmecon);
         model.setObjective(true, saugmeconObjective);
     }
 
@@ -326,7 +352,7 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         } else {
             // update right-hand side values (rhs) for the objective constraints
             updateObjectiveConstraints();
-            Solution solution = optimizeIntVar(true, true, true);
+            Solution solution = optimizeIntVar(true, false, true);
             if (stopCriterionReached){
                 if (solution != null) {
                     solutions.add(solution);
@@ -477,7 +503,7 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
     private void addBestObjectiveValuesAsSolutionIfNotDominated(){
         if (!solutions.isEmpty()) {
             for (int i = 0; i < bestObjectiveValues.length; i++) {
-                if (!solutionKisDominatedByTheFront(bestObjectiveValuesSolution[i], solutions, -1)) {
+                if (!solutionKisWeaklyDominatedByTheFront(bestObjectiveValuesSolution[i], solutions, -1)) {
                     solutions.add(i, bestObjectiveValuesSolution[i]);
                 } else {
                     recorderList.set(i, "Preprocessing solution" + recorderList.get(i));
@@ -492,18 +518,18 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         }
     }
     private void removeLastSolutionIfDominated(){
-        if (solutionKisDominatedByTheFront(solutions.get(solutions.size()-1), solutions, solutions.size()-1)) {
+        if (solutionKisWeaklyDominatedByTheFront(solutions.get(solutions.size()-1), solutions, solutions.size()-1)) {
             solutions.remove(solutions.size()-1);
             recorderList.set(recorderList.size()-1, "Dominated solution" + recorderList.get(recorderList.size()-1));
         }
     }
 
-    private boolean solutionKisDominatedByTheFront(Solution newSolution, List<Solution> front, int k) {
+    private boolean solutionKisWeaklyDominatedByTheFront(Solution newSolution, List<Solution> front, int k) {
         boolean newSolutionIsDominated = false;
         // at this point is possible that the
         for (int i = 0; i < front.size(); i++) {
             if (i != k){
-                if (solutionADominatesB(front.get(i), newSolution)) {
+                if (solutionAWeaklyDominatesB(front.get(i), newSolution)) {
                     newSolutionIsDominated = true;
                     break;
                 }
@@ -512,7 +538,7 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         return newSolutionIsDominated;
     }
 
-    private boolean solutionADominatesB(Solution solutionA, Solution solutionB) {
+    private boolean solutionAWeaklyDominatesB(Solution solutionA, Solution solutionB) {
         boolean dominates = true;
         for (IntVar objective : objectives) {
             if (solutionA.getIntVal(objective) < solutionB.getIntVal(objective)) {
