@@ -317,12 +317,10 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         recorder.onEnd();
         allSolutions = new ArrayList<>(solutions);
         if (stopCriterionReached) {
-            if (efArray[efArray.length-1] <= bestObjectiveValues[bestObjectiveValues.length-1]) {
-                exhaustive = false;
-                System.out.println("Stop criterion reached, the Pareto front may be incomplete");
-                addBestObjectiveValuesAsSolutionIfNotDominated();
-                removeLastSolutionIfDominated();
-            }
+            exhaustive = false;
+            System.out.println("Stop criterion reached, the Pareto front may be incomplete");
+            addBestObjectiveValuesAsSolutionIfNotDominated();
+            removeLastSolutionIfDominated();
         } else {
             for (int i = 0; i < objectives.length; i++) {
                 recorderList.set(i, "Preprocessing solution" + recorderList.get(i));

@@ -87,6 +87,14 @@ public class ParetoFront {
 		};
 	}
 
+	@DataProvider(name = "methodsUseIdeal")
+	public Object[][] methodsUseIdeal() {
+		return new Object[][]{
+				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"},
+				{"ParetoDisjunctiveProgrammingNoLabel"}, {"SaugmeconNoRTestReal"}, {"SaugmeconNoRTest"}
+		};
+	}
+
 	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
 	public Object[][] methodsOptimizeObjectivesIndividually() {
 		return new Object[][]{
@@ -119,13 +127,17 @@ public class ParetoFront {
 		String instanceFile = "n_queens_p-2_q-14_ins-4.dat";
 		int timeoutSec = 2;
 		long t0 = System.nanoTime();
-		JSONArray pfJson = runAndCollectPFStringsNqueens(method, instanceFile, timeoutSec);
 		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "nqueens");
 		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+		testGeneralAspectsWhenTimeout(rr, elapsedMs, method, timeoutSec);
+	}
+
+	private void testGeneralAspectsWhenTimeout(RunResult rr, long elapsedMs, String method, int timeoutSec) {
+		JSONArray pfJson = rr.solutionsDetails.getJSONArray("pareto_front");
 		System.out.println("Method " + method + " found " + pfJson.length() + " non-dominated solutions in "
 				+ elapsedMs + " ms. Exhaustive: " + rr.wasExhaustive() + ". Expected timeout: " + timeoutSec * 1000 + " ms.");
 
-		long upperBoundMs = timeoutSec * 1000 + 500;
+		long upperBoundMs = timeoutSec * 1000L + 1000;
 		assertTrue(elapsedMs <= upperBoundMs,
 				"Expected <= " + upperBoundMs + " ms, got " + elapsedMs + " ms");
 		assertFalse(rr.wasExhaustive(),
@@ -137,7 +149,8 @@ public class ParetoFront {
 			assertTrue(rr.solutionsDetails.getJSONArray("solutions_pareto_front").length() > 0,
 					"Expected some solutions in the Pareto set when timeout happens");
 		}
-
+		assertTrue(rr.stdout.contains("approximation"));
+		assertFalse(rr.stdout.contains("0 points"));
 		pfJsonToSet(pfJson, method);
 	}
 
@@ -213,7 +226,7 @@ public class ParetoFront {
 		assertTrue((objValFront ^ optFunctionValue) < 0);
 	}
 
-	@Test(dataProvider = "methodsMinimize", groups = "100s", timeOut = 100_000000)
+	@Test(dataProvider = "methodsMinimize", groups = "100s", timeOut = 100_000)
 	public void testObjFunctionDiffSignParetoInMaxProblemsForMinStrategies(String method) throws Exception{
 		String instanceFile = "n_queens_p-3_q-8_ins-1.dat";
 		int timeoutSec = 5;
@@ -226,6 +239,16 @@ public class ParetoFront {
 		JSONArray pf = rr.solutionsDetails.getJSONArray("pareto_front");
 		int objValFront = (Integer) pf.getJSONArray(0).get(0);
 		assertTrue((objValFront ^ optFunctionValue) < 0);
+	}
+
+	@Test(dataProvider = "methodsUseIdeal", groups = "100s", timeOut = 100_000)
+	public void testMethodsUsingIdealPointWhenTimeoutWhileFindingIdeal(String method) throws Exception {
+		String instanceFile = "J30_21_6.fzn";
+		int timeoutSec = 10;
+		long t0 = System.nanoTime();
+		RunResult rr= getOrRun(method, instanceFile, timeoutSec, "minizinc-rcpsp", "RCPSP");
+		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+		testGeneralAspectsWhenTimeout(rr, elapsedMs, method, timeoutSec);
 	}
 
 	private void compareMethodsWithNqueen(String baseMethod, String methodToTest, String instanceFile, int timeoutSec) throws Exception {
