@@ -61,12 +61,13 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
     public void initialization() {
         getObjectivesOptimalValues();
         getNadirObjectiveValues();
-        if (useRealObjectiveFunction) {
-            setSaugmeconObjectiveUsingReal();
-        } else {
-            setSaugmeconObjective();
+        if (!stopCriterionReached) {
+            if (useRealObjectiveFunction) {
+                setSaugmeconObjectiveUsingReal();
+            } else {
+                setSaugmeconObjective();
+            }
         }
-
         // initialize the epsilon array
         efArray = new int[nadirObjectiveValues.length];
         System.arraycopy(nadirObjectiveValues, 0, efArray, 0, nadirObjectiveValues.length);
@@ -252,23 +253,31 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         }
         double delta;
         if (objectives.length > 2) {
-            delta = Math.nextDown(1.0d / objectives.length);
+            delta = 1.0d / (objectives.length - 1); // todo delta = Math.nextDown(1.0d / (objectives.length - 1));
         } else {
-            delta = Math.nextDown(1.0d / (range[0]));
+            delta = 1.0d / (range[0]);
         }
+        double guard = 1e-6d;
+        delta = delta * (1.0d - guard);
 
         double[] coefficients = new double[objectives.length+1];
         coefficients[0] = 1d;
+        double smallestNonZeroCoefficient = Double.MAX_VALUE;
         if (objectives.length > 2) {
             for (int i = 1; i < objectives.length; i++) {
                 coefficients[i] = delta / (range[i - 1]);
+                if (coefficients[i] < smallestNonZeroCoefficient) {
+                    smallestNonZeroCoefficient = coefficients[i];
+                }
             }
         } else {
             coefficients[1] = delta;
+            smallestNonZeroCoefficient = delta;
         }
+        coefficients[coefficients.length-1] = -1d;
 
-        double lbSaugmeconObjective = 0;
-        double ubSaugmeconObjective = 0;
+        double lbSaugmeconObjective = 0.0d;
+        double ubSaugmeconObjective = 0.0d;
         for (int i = 0; i < objectives.length; i++) {
             lbSaugmeconObjective += coefficients[i] * objectives[i].getLB();
             ubSaugmeconObjective += coefficients[i] * objectives[i].getUB();
@@ -282,12 +291,7 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         if (maxRange <= 0d) {
             throw new IllegalStateException("maxRange must be > 0 for SAUGMECON precision");
         }
-        double precisionSaugmecon;
-        if (objectives.length > 2) {
-            precisionSaugmecon = Math.nextDown(delta / maxRange);
-        } else {
-            precisionSaugmecon = Math.nextDown(delta);
-        }
+        double precisionSaugmecon = smallestNonZeroCoefficient / 2.0d;
 
         RealVar saugmeconObjective = model.realVar("saugmeconObjective", lbSaugmeconObjective,
                 ubSaugmeconObjective, precisionSaugmecon);
@@ -295,8 +299,12 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
         Variable[] vars = new Variable[objectives.length + 1];
         System.arraycopy(objectives, 0, vars, 0, objectives.length);
         vars[objectives.length] = saugmeconObjective;
-        coefficients[coefficients.length-1] = -1d;
-        model.scalar(vars, coefficients, "=", 0).post();
+
+        // to ensure numerical stability, we add a small epsilon to the constraint instead of using equality
+        double eps;
+        eps = 10 * Math.ulp(Math.max(Math.abs(lbSaugmeconObjective), Math.abs(ubSaugmeconObjective)));
+        model.scalar(vars, coefficients, "<=", eps).post();
+        model.scalar(vars, coefficients, ">=", -eps).post();
         // precision objective
         model.setPrecision(precisionSaugmecon);
         model.setObjective(true, saugmeconObjective);
@@ -336,15 +344,18 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
 
     private int[] getSolutionForCurrentEpsilonValues() {
         int[] solutionObjectiveValues = null;
+        // uncomment for debugging
+//        boolean debug = true;
+//        if (debug) System.out.print("Searching for a solution with efArray: " + Arrays.toString(efArray));
         // set the upper bounds for all objectives except the first one
         SolutionEfArrayInformation previousSolutionSatisfyCurrentConstraint = searchPreviousSolutionsRelaxation(efArray, previousSolutionInformation);
         if (previousSolutionSatisfyCurrentConstraint != null) {
             // uncomment for debugging
-//            System.out.print(" is satisfied by a previous solution: ");
+//            if (debug) System.out.print(" is satisfied by a previous solution: ");
             if (previousSolutionSatisfyCurrentConstraint.isFeasible()) {
                 solutionObjectiveValues = previousSolutionSatisfyCurrentConstraint.getSolution();
                 // uncomment for debugging
-//                System.out.println(Arrays.toString(solutionObjectiveValues) + " efArrayPrevious: " +
+//                if (debug) System.out.println(Arrays.toString(solutionObjectiveValues) + " efArrayPrevious: " +
 //                        Arrays.toString(previousSolutionSatisfyCurrentConstraint.getEfArray()));
             }
         } else {
@@ -360,22 +371,22 @@ public class SaugmeconNoRecursion extends ParetoAbstract implements TimeoutHolde
                     // save solution information
                     saveSolutionInformation(efArray, null,  previousSolutionInformation);
                     // uncomment for debugging
-//                System.out.println(" after solved is infeasible");
+//                    if (debug) System.out.println(" after solved is infeasible");
                 } else {
                     solutionObjectiveValues = new int[objectives.length];
                     for (int i = 0; i < objectives.length; i++) {
                         solutionObjectiveValues[i] = solution.getIntVal(objectives[i]);
                     }
                     // uncomment for debugging
-//                System.out.println(" after solved is feasible: " + Arrays.toString(solutionObjectiveValues));
+//                    if (debug) System.out.println(" after solved is feasible: " + Arrays.toString(solutionObjectiveValues));
                     String solutionString = Arrays.toString(solutionObjectiveValues);
                     if (!previousSolutions.contains(solutionString)) {
                         previousSolutions.add(solutionString);
                         // add solution to the front
                         solutions.add(solution);
                     } //else { // uncomment for debugging
-//                    System.out.println("Above solution already in the front");
-//                }
+//                        if (debug) System.out.println("Above solution already in the front");
+//                    }
                     saveSolutionInformation(efArray, solutionObjectiveValues,  previousSolutionInformation);
                 }
             }

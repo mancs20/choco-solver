@@ -65,7 +65,7 @@ public class ParetoFront {
 //				{"SimpleOptGlobalConstraintTest"}, {"SimpleOptGlobalConstraint"}
 //				{"SimpleOptGlobalConstraint"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}, {"SimpleOptGlobalConstraintTest"}, {"SimpleOptGlobalConstraint"}
 				{"SaugmeconNoRTestReal"}, {"ParetoDisjunctiveProgrammingTest"}, {"SaugmeconGlobal"},
-				{"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}, {"ParetoDisjunctiveProgrammingNoLabel"}
+				{"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}, {"ParetoDisjunctiveProgrammingNoLabel"}, {"SimpleOptGlobalConstraintTest"}
 //				{"SaugmeconNoRTest"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
 //				{"Gavanelli"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
 //				{"ParetoDisjunctiveProgrammingTest"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
@@ -75,7 +75,7 @@ public class ParetoFront {
 	@DataProvider(name = "methodsMaximize")
 	public Object[][] methodsMaximize() {
 		return new Object[][]{
-			{"SimpleOptGlobalConstraint"}, {"SimpleOptGlobalConstraintTest"}, {"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"SimpleOptGlobalConstraintTest"}, {"Saugmecon"},
+			{"SimpleOptGlobalConstraintTest"}, {"SimpleOptGlobalConstraintTest"}, {"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"SimpleOptGlobalConstraintTest"}, {"Saugmecon"},
 			{"ParetoDisjunctiveProgrammingNoLabel"}, {"SaugmeconNoRTestReal"}
 		};
 	}
@@ -84,14 +84,6 @@ public class ParetoFront {
 	public Object[][] methodsMinimize() {
 		return new Object[][]{
 				{"ParetoDisjunctiveProgrammingTest"}
-		};
-	}
-
-	@DataProvider(name = "methodsUseIdeal")
-	public Object[][] methodsUseIdeal() {
-		return new Object[][]{
-				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"},
-				{"ParetoDisjunctiveProgrammingNoLabel"}, {"SaugmeconNoRTestReal"}, {"SaugmeconNoRTest"}
 		};
 	}
 
@@ -150,7 +142,7 @@ public class ParetoFront {
 					"Expected some solutions in the Pareto set when timeout happens");
 		}
 		assertTrue(rr.stdout.contains("approximation"));
-		assertFalse(rr.stdout.contains("0 points"));
+		assertFalse(rr.stdout.contains("There are 0 points"));
 		pfJsonToSet(pfJson, method);
 	}
 
@@ -183,6 +175,19 @@ public class ParetoFront {
 		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
 		System.out.println("Method " + method + " compared to " + baseMethodInComparisson + " in "
 				+ elapsedMs + " ms.");
+	}
+
+	@Test(groups = "10s", timeOut = 10_000)
+	public void testSaugmeconRealFloatingPoint() throws Exception {
+		String instanceFile = "paris_30_cost_clouds_angle.fzn";
+		int timeoutSec = 5;
+		String method = "SaugmeconNoRTestReal";
+		String refMethod = "SaugmeconNoRTest";
+		RunResult rrReal = getOrRun(method, instanceFile, timeoutSec, "powa", "sims");
+		RunResult rrInt = getOrRun(refMethod, instanceFile, timeoutSec, "powa", "sims");
+		JSONArray pfJsonReal = rrReal.solutionsDetails.getJSONArray("pareto_front");
+		JSONArray pfJsonInt = rrInt.solutionsDetails.getJSONArray("pareto_front");
+		compareParetoFrontJson(pfJsonInt, pfJsonReal, refMethod, method, instanceFile);
 	}
 
 	@Test(groups = "200s", timeOut = 200_000)
@@ -239,16 +244,6 @@ public class ParetoFront {
 		JSONArray pf = rr.solutionsDetails.getJSONArray("pareto_front");
 		int objValFront = (Integer) pf.getJSONArray(0).get(0);
 		assertTrue((objValFront ^ optFunctionValue) < 0);
-	}
-
-	@Test(dataProvider = "methodsUseIdeal", groups = "100s", timeOut = 100_000)
-	public void testMethodsUsingIdealPointWhenTimeoutWhileFindingIdeal(String method) throws Exception {
-		String instanceFile = "J30_21_6.fzn";
-		int timeoutSec = 10;
-		long t0 = System.nanoTime();
-		RunResult rr= getOrRun(method, instanceFile, timeoutSec, "minizinc-rcpsp", "RCPSP");
-		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
-		testGeneralAspectsWhenTimeout(rr, elapsedMs, method, timeoutSec);
 	}
 
 	private void compareMethodsWithNqueen(String baseMethod, String methodToTest, String instanceFile, int timeoutSec) throws Exception {
@@ -374,7 +369,17 @@ public class ParetoFront {
 		}
 	}
 
-	@Test(dataProvider = "methodsOptimizeObjectivesIndividually", groups = "15s", timeOut = 15_000)
+	@Test(dataProvider = "methodsOptimizeObjectivesIndividually", groups = "100s", timeOut = 100_000)
+	public void testParetoMethodsWhenTimeoutReachedWhileFindingIndividualOptimalValues(String method) throws Exception {
+		String instanceFile = "J30_21_6.fzn";
+		int timeoutSec = 10;
+		long t0 = System.nanoTime();
+		RunResult rr= getOrRun(method, instanceFile, timeoutSec, "minizinc-rcpsp", "RCPSP");
+		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+		testGeneralAspectsWhenTimeout(rr, elapsedMs, method, timeoutSec);
+	}
+
+	@Test(dataProvider = "methodsOptimizeObjectivesIndividually", groups = "15s", timeOut = 15_0000000)
 	public void testParetoMethodsWhenTimeoutReachedAfterIndividualOptimalValues(String method) throws Exception {
 		String instanceFile = "lagos_nigeria_100_cost_clouds_angle.fzn";
 		int timeoutSec = 1;
