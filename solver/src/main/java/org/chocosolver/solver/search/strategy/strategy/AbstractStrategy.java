@@ -1,7 +1,7 @@
 /*
  * This file is part of choco-solver, http://choco-solver.org/
  *
- * Copyright (c) 2025, IMT Atlantique. All rights reserved.
+ * Copyright (c) 2026, IMT Atlantique. All rights reserved.
  *
  * Licensed under the BSD 4-clause license.
  *
@@ -44,6 +44,19 @@ public abstract class AbstractStrategy<V extends Variable> {
      */
     @SafeVarargs
     protected AbstractStrategy(V... variables) {
+        this(variables.length > 0 ? variables[0].getModel() : null, variables);
+    }
+
+    /**
+     * Create a search strategy based on an array of variables
+     *
+     * @param variables array of variables
+     * @implNote the first variable is used to get the model and the decision path.
+     * If the first variable is null, the model and decision path are null.
+     * @implNote the variables are cloned to avoid side effects
+     */
+    @SafeVarargs
+    protected AbstractStrategy(Model model, V... variables) {
         this.model = variables.length > 0 ? variables[0].getModel() : null;
         this.decisionPath = model != null ? model.getSolver().getDecisionPath() : null;
         this.vars = variables.clone();

@@ -1,7 +1,7 @@
 /*
  * This file is part of choco-solver, http://choco-solver.org/
  *
- * Copyright (c) 2025, IMT Atlantique. All rights reserved.
+ * Copyright (c) 2026, IMT Atlantique. All rights reserved.
  *
  * Licensed under the BSD 4-clause license.
  *
@@ -69,7 +69,7 @@ public class ConflictHistorySearch<V extends Variable>
      * @param seed seed for breaking ties randomly
      */
     public ConflictHistorySearch(V[] vars, long seed) {
-        super(vars, seed, Integer.MAX_VALUE);
+        super(vars, seed, 20);
     }
 
     @Override
