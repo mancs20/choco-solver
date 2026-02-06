@@ -11,6 +11,7 @@ package org.chocosolver.solver.search.strategy.selectors.variables;
 
 import org.chocosolver.solver.constraints.Propagator;
 import org.chocosolver.solver.exception.ContradictionException;
+import org.chocosolver.solver.search.loop.monitors.IMonitorInitialize;
 import org.chocosolver.solver.search.loop.monitors.IMonitorRestart;
 import org.chocosolver.solver.variables.IVariableMonitor;
 import org.chocosolver.solver.variables.IntVar;
@@ -34,7 +35,7 @@ import java.util.function.BiFunction;
  */
 public class DomOverWDeg<V extends Variable>
         extends AbstractCriterionBasedVariableSelector<V>
-        implements IMonitorRestart, IVariableMonitor<V> {
+        implements IMonitorRestart, IMonitorInitialize, IVariableMonitor<V> {
 
     /**
      * An element helps to keep 2 things up to date:
@@ -52,6 +53,11 @@ public class DomOverWDeg<V extends Variable>
      * Stores for each propagator, its {@link Element}.
      */
     final HashMap<Propagator<?>, Element> failCount = new HashMap<>();
+
+    /**
+     * Reset counter
+     */
+    private int resetCount = 0;
 
     private final BiFunction<Propagator<?>, double[], double[]> remapWeights =
             (p, w) -> {
@@ -220,6 +226,15 @@ public class DomOverWDeg<V extends Variable>
         }
     }
 
+    @Override
+    public void beforeInitialize() {
+        // Clear per-propagator tracking (otherwise it may bias watchers & bookkeeping)
+        failCount.clear();
+        refinedWeights.clear();
+        weights.clear();
+        resetCount++;
+        modifyRandom(resetCount);
+    }
 
     /// ///////////////////////////////////////////////////////////////////
     /// /////////////// THIS IS RELATED TO INCREMENTAL FUTVARS ////////////

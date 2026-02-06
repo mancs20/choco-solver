@@ -5,7 +5,7 @@ import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 
 import org.chocosolver.solver.constraints.Constraint;
-import org.chocosolver.solver.objective.ParetoMaximizer;
+import org.chocosolver.solver.objective.ObjectiveFactory;
 import org.chocosolver.solver.objective.mocoframework.component.findsolution.FindNonDominatedSolutionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.initialregion.InitialRegionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.objectivefunction.ObjectiveFunctionStrategy;
@@ -66,7 +66,14 @@ public class MocoStrategy {
                 model.setObjective(Model.MAXIMIZE, objVar);
                 Constraint rawObj = params.getObjectiveFunction();
                 rawObj.post();
+                if (params.isUseObjectiveManagerForObjectivesDomain()) {
+                    model.getSolver().setObjectiveManager(ObjectiveFactory.makeMaxIntObjManagerWithObjsLB(objVar, objectives));
+                }
             }
+        }
+
+        if (objectiveFunction != null || params.isLexicographicOptimization()) {
+            params.setCheckIfNewSolutionDominates(false);
         }
 
         boolean checkDominanceWhenAdding;
@@ -83,8 +90,8 @@ public class MocoStrategy {
             updateRegions.update(regionConstraints, archive, objectives, s, params);
             updatingTime += System.nanoTime() - startUpdating;
         }
-        System.out.println(String.format("Total solving time: %.3fs", solvingTime / (1000f * 1000f * 1000f)));
-        System.out.println(String.format("Total updating time: %.3fs", updatingTime / (1000f * 1000f * 1000f)));
+        System.out.printf("Total solving time: %.3fs%n", solvingTime / (1000f * 1000f * 1000f));
+        System.out.printf("Total updating time: %.3fs%n", updatingTime / (1000f * 1000f * 1000f));
         List<String> recorderList = params.getRecorderList();
         if (recorderList.size() == 0) {
             recorderList.add(model.getSolver().getMeasures().toString());

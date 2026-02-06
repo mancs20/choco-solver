@@ -144,4 +144,8 @@ public abstract class AbstractCriterionBasedVariableSelector<V extends Variable>
         }
     }
 
+    public void modifyRandom(long seed) {
+        random.setSeed(seed);
+    }
+
 }

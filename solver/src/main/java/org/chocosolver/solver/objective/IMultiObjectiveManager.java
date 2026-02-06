@@ -32,9 +32,11 @@ public interface IMultiObjectiveManager {
         if (model.getSolver().getSearch() == null) {
             if (decisionVars.length == 0) {
                 IntVar[] notObjectivesVars = getNonObjectiveVariables(model, objectives);
-                model.getSolver().setSearch(Search.minDomLBSearch(notObjectivesVars));
+//                model.getSolver().setSearch(Search.minDomLBSearch(notObjectivesVars));
+                model.getSolver().setSearch(Search.domOverWDegSearch(notObjectivesVars));
             } else {
-                model.getSolver().setSearch(Search.minDomLBSearch(decisionVars));
+//                model.getSolver().setSearch(Search.minDomLBSearch(decisionVars));
+                model.getSolver().setSearch(Search.domOverWDegSearch(decisionVars));
             }
 
             //todo test

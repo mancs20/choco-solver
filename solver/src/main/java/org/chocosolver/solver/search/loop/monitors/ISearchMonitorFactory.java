@@ -45,6 +45,15 @@ public interface ISearchMonitorFactory extends ISelf<Solver> {
         if(!ref().isLCG()) ref().plugMonitor(new NogoodFromRestarts(ref().getModel()));
     }
 
+    /**
+     * Record nogoods from solution and use them in new searches for multi-objective optimization, that is,
+     * anytime a solution is found, a nogood is produced to prevent from
+     * finding the same solution later in another search.
+     */
+    default void setNoGoodRecordingFromSolutionsForMOO(IntVar... vars) {
+        ref().plugMonitor(new BufferedSolutionNogoodsForMOO(vars));
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**

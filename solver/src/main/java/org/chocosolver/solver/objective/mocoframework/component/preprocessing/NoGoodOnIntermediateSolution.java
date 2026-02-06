@@ -20,6 +20,6 @@ public class NoGoodOnIntermediateSolution implements PreprocessingStrategy{
         } else {
             allVars = model.retrieveIntVars(true);
         }
-        model.getSolver().setNoGoodRecordingFromSolutions(allVars);
+        model.getSolver().setNoGoodRecordingFromSolutionsForMOO(allVars);
     }
 }

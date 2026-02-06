@@ -837,7 +837,8 @@ public final class Solver implements ISolver, IMeasures, IOutputFactory {
         if (isLCG()) {
             mSat.deleteAllLearnedClauses();
         } else if (mModel.getHook(Model.MINISAT_HOOK_NAME) != null) {
-            mModel.getMinisat().getPropSat().reset();
+            // todo : this is a workaround to not reset the state of the SAT solver, but it is not clean. We should have a better way to do that.
+//            mModel.getMinisat().getPropSat().reset();
         }
         removeAllStopCriteria();
         feasible = UNDEFINED;
