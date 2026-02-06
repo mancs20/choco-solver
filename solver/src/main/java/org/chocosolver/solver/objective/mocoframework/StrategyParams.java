@@ -37,6 +37,12 @@ public class StrategyParams {
     // ────────────── Gavanelli-Specific Parameters ──────────────
     private ParetoMaximizer paretoMaximizer;
 
+    // ────────────── No good on solutions and on restart ──────────────
+    private boolean useNoGoodOnSolution = false;
+
+    // ────────────── Use objective manager for the objectives domain ──────────────
+    private boolean useObjectiveManagerForObjectivesDomain = false;
+
     // ────────────── Getters and Setters ──────────────
 
     public boolean isAddIntermediateSolutions() {
@@ -161,5 +167,15 @@ public class StrategyParams {
 
     public void setParetoMaximizer(ParetoMaximizer paretoMaximizer) {
         this.paretoMaximizer = paretoMaximizer;
+    }
+
+    public void setNoGoodOnSolution(Boolean useNoGoodOnSolution){this.useNoGoodOnSolution = useNoGoodOnSolution;}
+
+    public boolean isUseObjectiveManagerForObjectivesDomain() {
+        return useObjectiveManagerForObjectivesDomain;
+    }
+
+    public void setUseObjectiveManagerForObjectivesDomain(boolean useObjectiveManagerForObjectivesDomain) {
+        this.useObjectiveManagerForObjectivesDomain = useObjectiveManagerForObjectivesDomain;
     }
 }

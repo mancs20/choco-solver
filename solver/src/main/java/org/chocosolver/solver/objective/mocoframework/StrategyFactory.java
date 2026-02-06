@@ -41,6 +41,12 @@ public class StrategyFactory {
             case ADD_INTERMEDIATE_SOLUTIONS:
                 strategy = new AddIntermediateSolutionsPreprocessing();
                 break;
+            case NO_GOOD_ON_INTERMEDIATE_SOLUTIONS:
+                strategy = new NoGoodOnIntermediateSolution();
+                break;
+            case USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES:
+                strategy = new ObjectiveManagerWithObjLB();
+                break;
             default:
                 throw new IllegalArgumentException("Unknown PreprocessingType: " + type);
         }
@@ -85,6 +91,9 @@ public class StrategyFactory {
             case SAUGMECON:
                 strategy = new SaugmeconFindSolution(this.sharedSolutionFinder);
                 break;
+            case GIA:
+                strategy = new GIAOptSumFindSolution(this.sharedSolutionFinder);
+                break;
             default:
                 throw new IllegalArgumentException("Unknown FindSolutionType: " + type);
         }
@@ -107,6 +116,9 @@ public class StrategyFactory {
                 break;
             case SAUGMECON:
                 strategy = new SaugmeconUpdate();
+                break;
+            case GIA:
+                strategy = new GIAUpdate();
                 break;
             default:
                 throw new IllegalArgumentException("Unknown UpdateRegionType: " + type);

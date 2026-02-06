@@ -56,6 +56,19 @@ public final class ObjectiveFactory {
     }
 
     /**
+     * Define a manager for multiobjective optimization that applies a cut to the objective function and to the
+     * objectives
+     *
+     * @return the objective manager
+     */
+    public static IObjectiveManager<IntVar> makeMaxIntObjManagerWithObjsLB(IntVar objectiveFunction,
+                                                                       IntVar[] objectives) {
+        IObjectiveManager<IntVar> objman = new MaxIntObjManagerWithObjsLB(objectiveFunction, objectives);
+        objman.setStrictDynamicCut();
+        return objman;
+    }
+
+    /**
      * Define the variable to optimize (maximize or minimize)
      * By default, the manager uses {@link IObjectiveManager#setStrictDynamicCut()} to avoid exploring worse solutions.
      *

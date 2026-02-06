@@ -1,0 +1,22 @@
+package org.chocosolver.solver.objective.mocoframework.component.updateregions;
+
+import org.chocosolver.solver.Solution;
+import org.chocosolver.solver.objective.mocoframework.StrategyParams;
+import org.chocosolver.solver.objective.mocoframework.structure.ParetoArchive;
+import org.chocosolver.solver.objective.mocoframework.structure.Region;
+import org.chocosolver.solver.variables.IntVar;
+
+import java.util.Set;
+
+public class GIAUpdate implements UpdateRegionsStrategy{
+
+    @Override
+    public void update(Set<Region> regions, ParetoArchive archive, IntVar[] objectives, Solution solution, StrategyParams params) {
+        if (regions.size() != 1) {
+            throw new IllegalStateException("Expected a single region but found: " + regions.size());
+        }
+        if (solution == null || !solution.exists()) {
+            regions.clear();
+        }
+    }
+}
