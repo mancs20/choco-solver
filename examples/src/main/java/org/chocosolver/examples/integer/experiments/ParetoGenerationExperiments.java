@@ -87,7 +87,11 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
         }else{
             BuilderModel builderModel = new BuilderModel(config);
             for (int i = 0; i < portfolioSize; i++) {
-                modelAndObjectivesArray[i] = builderModel.createModel(i);
+                if (solverSearchStrategy.equalsIgnoreCase("lcg")) {
+                    modelAndObjectivesArray[i] = builderModel.createModel(i, true);
+                } else {
+                    modelAndObjectivesArray[i] = builderModel.createModel(i, false);
+                }
             }
             modelAndObjectives = modelAndObjectivesArray[0];
         }

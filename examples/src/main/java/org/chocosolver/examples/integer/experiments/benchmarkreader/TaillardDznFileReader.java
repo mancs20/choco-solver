@@ -68,6 +68,6 @@ public class TaillardDznFileReader extends BenchamarkReader implements ProblemPe
             System.exit(1);
         }
 
-        return implementFlowShopPermutation(getModelName(index), jobTaskDuration, dueDates);
+        return implementFlowShopPermutation(model, jobTaskDuration, dueDates);
     }
 }

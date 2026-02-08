@@ -6,4 +6,6 @@ import org.chocosolver.solver.variables.IntVar;
 
 public interface ObjectiveFunctionStrategy {
     IntVar define(Model model, IntVar[] objectives, StrategyParams params);
+
+    boolean isNone();
 }

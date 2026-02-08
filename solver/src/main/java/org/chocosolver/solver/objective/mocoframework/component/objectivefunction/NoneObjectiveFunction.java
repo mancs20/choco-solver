@@ -10,4 +10,9 @@ public class NoneObjectiveFunction implements ObjectiveFunctionStrategy{
     public IntVar define(Model model, IntVar[] objectives, StrategyParams params) {
         return null;
     }
+
+    @Override
+    public boolean isNone() {
+        return true;
+    }
 }

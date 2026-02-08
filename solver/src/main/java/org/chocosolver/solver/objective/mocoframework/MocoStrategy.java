@@ -60,7 +60,7 @@ public class MocoStrategy {
             step.apply(model, objectives, archive, params, stop);
         }
         // objective function if any
-        if (objectiveFunction != null && !params.isLexicographicOptimization()) {
+        if (!objectiveFunction.isNone() && !params.isLexicographicOptimization()) {
             IntVar objVar = objectiveFunction.define(model, objectives, params);
             if (objVar != null) {
                 model.setObjective(Model.MAXIMIZE, objVar);
@@ -72,7 +72,7 @@ public class MocoStrategy {
             }
         }
 
-        if (objectiveFunction != null || params.isLexicographicOptimization()) {
+        if (!objectiveFunction.isNone() || params.isLexicographicOptimization()) {
             params.setCheckIfNewSolutionDominates(false);
         }
 

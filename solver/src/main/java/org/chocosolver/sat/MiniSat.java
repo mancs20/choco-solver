@@ -874,6 +874,14 @@ public class MiniSat implements SatFactory {
         learnts.clear();
     }
 
+    public void deleteRemovableLearnedClauses() {
+        for (int i = learnts.size() - 1; i >= learnt_first_removable; i--) {
+            Clause c = learnts.get(i);
+            removeClause(c);
+            learnts.remove(i);
+        }
+    }
+
     public void doReduceDB() {
         int i, j;
         double extra_lim = cla_inc / learnts.size();    // Remove any clause below this activity
