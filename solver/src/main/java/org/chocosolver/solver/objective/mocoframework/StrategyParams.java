@@ -41,6 +41,7 @@ public class StrategyParams {
     // ────────────── No good on solutions and on restart ──────────────
     private boolean useNoGoodOnSolution = false;
     private NogoodFromDominanceFails nogoodFromDominanceFails;
+    private boolean noGoodsLearntFromNonObjectiveFails = false;
 
     // ────────────── Use objective manager for the objectives domain ──────────────
     private boolean useObjectiveManagerForObjectivesDomain = false;
@@ -185,7 +186,12 @@ public class StrategyParams {
         return nogoodFromDominanceFails;
     }
 
-    public void setNogoodFromDominanceFails(NogoodFromDominanceFails nogoodFromDominanceFails) {
+    public void setNogoodFromDominanceFails(NogoodFromDominanceFails nogoodFromDominanceFails, boolean isNoGoodLearntFromNonObjectiveFails) {
         this.nogoodFromDominanceFails = nogoodFromDominanceFails;
+        this.noGoodsLearntFromNonObjectiveFails = isNoGoodLearntFromNonObjectiveFails;
+    }
+
+    public boolean isNoGoodsLearntFromNonObjectiveFails() {
+        return noGoodsLearntFromNonObjectiveFails;
     }
 }
