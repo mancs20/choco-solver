@@ -28,6 +28,6 @@ public class NoGoodOnIntermediateSolution implements PreprocessingStrategy{
         }
         model.getSolver().setNoGoodRecordingFromSolutionsForMOO(allVars);
         NogoodFromDominanceFails nogoodFromDominanceFails = model.getSolver().setNoGoodFromDominanceFails(objectives, learnFromNonObjectiveFails);
-        params.setNogoodFromDominanceFails(nogoodFromDominanceFails);
+        params.setNogoodFromDominanceFails(nogoodFromDominanceFails, learnFromNonObjectiveFails);
     }
 }
