@@ -48,7 +48,8 @@ public final class BufferedSolutionNogoodsForMOO implements IMonitorSolution, IM
         for (int off = 0; off < m; off += n) {
             int[] ng = new int[n]; // fresh array => no aliasing
             for (int i = 0; i < n; i++) ng[i] = litBuf.get(off + i);
-            png.addLearnt(ng);
+//            png.addLearnt(ng);
+            png.addLearntUsingBuckets(n, ng);
         }
         litBuf.resetQuick();
     }

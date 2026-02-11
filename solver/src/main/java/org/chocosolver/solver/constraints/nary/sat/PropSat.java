@@ -212,6 +212,20 @@ public class PropSat extends Propagator<Variable> {
     }
 
     /**
+     * Add learnt clause to SAT solver
+     *
+     * @param keyForBucket the key of the bucket to which the clause belongs
+     * @param lits clause
+     */
+    public void addLearntUsingBuckets(int keyForBucket, int... lits) {
+        sat_.learnClauseAtDecisionDepth(keyForBucket, lits);
+        forcePropagationOnBacktrack(); // issue#327
+        // early deductions of learnt clause may lead to incorrect behavior on backtrack
+        // since early deduction is not backtrackable.
+
+    }
+
+    /**
      * Reset the underlying SAT decorator.
      * <p>
      *     This method removes all learnt clauses and literals from the SAT solver.

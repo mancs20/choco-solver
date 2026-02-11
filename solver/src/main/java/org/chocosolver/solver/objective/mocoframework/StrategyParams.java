@@ -4,6 +4,7 @@ import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.objective.ParetoMaximizer;
 import org.chocosolver.solver.objective.mocoframework.component.findsolution.SolutionEpsilonArrayInformation;
+import org.chocosolver.solver.search.loop.monitors.NogoodFromDominanceFails;
 
 import java.util.*;
 
@@ -31,14 +32,15 @@ public class StrategyParams {
     private int[] objectivesOrder;
     private int[] epsilonArray;
     private int[] relativeWorstValue;
-    private Set<String> previousSolutions = new HashSet<>();
-    private List<SolutionEpsilonArrayInformation> previousSolutionInfo = new ArrayList<>();
+    private final Set<String> previousSolutions = new HashSet<>();
+    private final List<SolutionEpsilonArrayInformation> previousSolutionInfo = new ArrayList<>();
 
     // ────────────── Gavanelli-Specific Parameters ──────────────
     private ParetoMaximizer paretoMaximizer;
 
     // ────────────── No good on solutions and on restart ──────────────
     private boolean useNoGoodOnSolution = false;
+    private NogoodFromDominanceFails nogoodFromDominanceFails;
 
     // ────────────── Use objective manager for the objectives domain ──────────────
     private boolean useObjectiveManagerForObjectivesDomain = false;
@@ -177,5 +179,13 @@ public class StrategyParams {
 
     public void setUseObjectiveManagerForObjectivesDomain(boolean useObjectiveManagerForObjectivesDomain) {
         this.useObjectiveManagerForObjectivesDomain = useObjectiveManagerForObjectivesDomain;
+    }
+
+    public NogoodFromDominanceFails getNogoodFromDominanceFails() {
+        return nogoodFromDominanceFails;
+    }
+
+    public void setNogoodFromDominanceFails(NogoodFromDominanceFails nogoodFromDominanceFails) {
+        this.nogoodFromDominanceFails = nogoodFromDominanceFails;
     }
 }

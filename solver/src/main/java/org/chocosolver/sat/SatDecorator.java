@@ -36,6 +36,14 @@ public class SatDecorator extends MiniSat {
     public TIntArrayList dynLits = new TIntArrayList();
     private final TIntObjectHashMap<Literalizer> lits = new TIntObjectHashMap<>();
     private final HashMap<Variable, List<Literalizer>> vars = new HashMap<>();
+
+    // --- bucket mode (optional) ---
+    private ArrayDeque<Clause>[] buckets = null; // buckets[decisionDepth]
+    private int deepestNonEmpty = -1;
+    // identity presence: avoids problems if a clause is removed elsewhere
+    private final IdentityHashMap<Clause, Integer> dynIndex = new IdentityHashMap<>();
+
+
     /**
      * For comparison with SAT solver trail, to deal properly with backtrack
      */
@@ -53,6 +61,11 @@ public class SatDecorator extends MiniSat {
 
     private final TIntArrayList touched_variables_;
 
+    // --- bucketed storage of dynamic learnt clauses ---
+    private final int maxDynClauses = 50_000;      // start here
+    private final int trimTo = 40_000;            // hysteresis (avoid trimming every clause)
+    public boolean trimDynClausesAlready = false;           // whether to trim or not (for debugging)
+
     public SatDecorator(Model model) {
         super(false);
         sat_trail_ = model.getEnvironment().makeInt();
@@ -66,6 +79,30 @@ public class SatDecorator extends MiniSat {
 
     public void afterAddingClauses() {
         this.storeEarlyDeductions();
+    }
+
+    private void trimDynClauses() {
+        if (dynClauses.size() <= maxDynClauses) return;
+
+        // Prefer to remove longer clauses first (cheap-ish heuristic: skip binaries)
+        // FIFO removal among removable ones.
+        int i = 0;
+        while (dynClauses.size() > trimTo && i < dynClauses.size()) {
+            Clause c = dynClauses.get(i);
+            if (c.size() <= 2) { // keep binaries if possible
+                i++;
+                continue;
+            }
+            detachLearntBucket(i); // removes element at i, so don't increment i
+        }
+        // If still too many (e.g., mostly binaries), drop oldest anyway
+        while (dynClauses.size() > trimTo) {
+            detachLearntBucket(0);
+        }
+
+        // tod debug
+        System.out.println("Trimmed learnt clauses: " + dynClauses.size() + " remaining");
+        trimDynClausesAlready = true;
     }
 
 
@@ -92,6 +129,38 @@ public class SatDecorator extends MiniSat {
                 dynClauses.add(cr);
                 attachClause(cr);
                 break;
+        }
+    }
+
+    /** Same semantics as learnClause, but also puts the clause into a decision-depth bucket */
+    public void learnClauseAtDecisionDepth(int decisionDepth, int... ps) {
+        Arrays.sort(ps);
+        switch (ps.length) {
+            case 0:
+                ok_ = false;
+                return;
+            case 1:
+                dynLits.add(ps[0]);
+                dynUncheckedEnqueue(ps[0]);
+                propagate();
+                ok_ = (confl == C_Undef);
+                return;
+            default:
+                Clause cr = new Clause(ps);
+                dynIndex.put(cr, dynClauses.size());
+                dynClauses.add(cr);
+
+                attachClause(cr);
+
+                if (buckets != null) {
+                    int d = clampDepth(decisionDepth);
+                    buckets[d].addLast(cr);
+                    if (d > deepestNonEmpty) deepestNonEmpty = d;
+                    trimDynClausesBucketed(); // only if bucket mode enabled
+                } else {
+                    // fallback: keep your existing trimming if you want
+                    trimDynClauses(); // your current one (optional)
+                }
         }
     }
 
@@ -128,6 +197,11 @@ public class SatDecorator extends MiniSat {
         dynClauses.remove(ci);
     }
 
+    private void detachLearntBucket(int ci) {
+        Clause cr = dynClauses.get(ci);
+        detachDynClause(cr); // O(1) removal + map update
+    }
+
     public void reset() {
         deleteLearntLits();
         deleteLearntClauses();
@@ -138,6 +212,8 @@ public class SatDecorator extends MiniSat {
             detachClause(dynClauses.get(i));
         }
         dynClauses.clear();
+        dynIndex.clear();
+        deepestNonEmpty = -1;
     }
 
 
@@ -309,5 +385,74 @@ public class SatDecorator extends MiniSat {
             return false;
         }
         return true;
+    }
+
+    // bucket related
+    /** Call from outside once (e.g., from NogoodFromDomFails init) */
+    public void enableDecisionBuckets(int maxDecisionDepth) {
+        // +1 so depth==maxDecisionDepth is valid
+        buckets = (ArrayDeque<Clause>[]) new ArrayDeque[maxDecisionDepth + 1];
+        for (int i = 0; i < buckets.length; i++) buckets[i] = new ArrayDeque<>();
+        deepestNonEmpty = -1;
+        dynIndex.clear();
+    }
+
+    private int clampDepth(int depth) {
+        if (depth < 0) return 0;
+        if (buckets == null) return 0;
+        return Math.min(depth, buckets.length - 1);
+    }
+
+    private void trimDynClausesBucketed() {
+        if (dynClauses.size() <= maxDynClauses) return;
+
+        int toRemove = dynClauses.size() - trimTo; // how many we need to drop
+
+        while (toRemove > 0 && deepestNonEmpty >= 0) {
+
+            // move deepestNonEmpty left until we find a non-empty bucket
+            while (deepestNonEmpty >= 0 && (buckets[deepestNonEmpty] == null || buckets[deepestNonEmpty].isEmpty())) {
+                deepestNonEmpty--;
+            }
+            if (deepestNonEmpty < 0) break;
+
+            ArrayDeque<Clause> q = buckets[deepestNonEmpty];
+
+            // DRAIN this bucket while needed
+            while (toRemove > 0 && !q.isEmpty()) {
+                Clause victim = q.pollFirst();
+
+                // if it was removed by some other path, skip it
+                if (!dynIndex.containsKey(victim)) continue;
+
+                detachDynClause(victim);
+                toRemove--;
+            }
+
+            // if bucket now empty, loop will decrement deepestNonEmpty next iteration
+        }
+        trimDynClausesAlready = true;
+        // tod debug
+        System.out.println("Trimmed learnt clauses: " + dynClauses.size() + " remaining");
+    }
+
+    private void detachDynClause(Clause cr) {
+        detachClause(cr);
+        removeDynClauseFast(cr);
+    }
+
+    private void removeDynClauseFast(Clause target) {
+        Integer idxObj = dynIndex.get(target);
+        if (idxObj == null) return; // already removed
+        int idx = idxObj;
+        int last = dynClauses.size() - 1;
+
+        if (idx != last) {
+            Clause moved = dynClauses.get(last);
+            dynClauses.set(idx, moved);
+            dynIndex.put(moved, idx);
+        }
+        dynClauses.remove(last);
+        dynIndex.remove(target);
     }
 }
