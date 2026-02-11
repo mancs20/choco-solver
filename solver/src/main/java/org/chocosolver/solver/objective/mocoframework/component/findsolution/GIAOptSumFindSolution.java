@@ -5,7 +5,6 @@ import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.objective.IObjectiveManager;
 import org.chocosolver.solver.objective.MaxIntObjManagerWithObjsLB;
-import org.chocosolver.solver.objective.ParetoMaximizer;
 import org.chocosolver.solver.objective.mocoframework.StrategyParams;
 import org.chocosolver.solver.objective.mocoframework.structure.ParetoArchive;
 import org.chocosolver.solver.objective.mocoframework.structure.Region;
@@ -48,8 +47,8 @@ public class GIAOptSumFindSolution extends AbstractFindSolutionStrategy {
         long pre = model.getSolver().getSolutionCount();
         // recycle a solution from the pool of dominated solutions
         Solution sol = archive.borrowDominatedSolutionFromPool();
-        params.getParetoMaximizer().setEnabled(true);
-        optimizeObjectiveFunction(model, sol, objectives, params.getParetoMaximizer());
+        prepareSearchForNonDominatedSolutions(params);
+        optimizeObjectiveFunction(model, sol, objectives, params);
 
         boolean foundSolution = model.getSolver().getSolutionCount() > pre;
 
@@ -75,7 +74,7 @@ public class GIAOptSumFindSolution extends AbstractFindSolutionStrategy {
         return null;
     }
 
-    private void optimizeObjectiveFunction(Model model, Solution sol, IntVar[] objectives, ParetoMaximizer paretoConstraint) {
+    private void optimizeObjectiveFunction(Model model, Solution sol, IntVar[] objectives, StrategyParams params) {
         boolean foundSolution = false;
         int[] objLBs = new int[objectives.length];
         IObjectiveManager<?> om = model.getSolver().getObjectiveManager();
@@ -86,9 +85,27 @@ public class GIAOptSumFindSolution extends AbstractFindSolutionStrategy {
             }
             if (!foundSolution) {
                 foundSolution = true;
-                paretoConstraint.setEnabled(false);
+                prepareSearchForImprovingSolution(params);
                 ((MaxIntObjManagerWithObjsLB) om).setObjectivesLowerBound(objLBs);
             }
+        }
+    }
+
+    private void prepareSearchForNonDominatedSolutions(StrategyParams params) {
+        params.getParetoMaximizer().setEnabled(true);
+        // todo uncomment later that we have test the simplest version
+        if (params.getNogoodFromDominanceFails() != null) {
+            params.getNogoodFromDominanceFails().setRefutedCanBeParetoDominated(true);
+            params.getNogoodFromDominanceFails().setLearnFromNonObjectiveFails(true); // learning from all the fails
+//            is too slow, and the number of nodes explored is almost the same, but much slower
+        }
+    }
+
+    private void prepareSearchForImprovingSolution(StrategyParams params) {
+        params.getParetoMaximizer().setEnabled(false);
+        if (params.getNogoodFromDominanceFails() != null) {
+            params.getNogoodFromDominanceFails().setRefutedCanBeParetoDominated(false);
+            params.getNogoodFromDominanceFails().setLearnFromNonObjectiveFails(false);
         }
     }
 }

@@ -256,7 +256,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
                         List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
                                 strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS),
-                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_INTERMEDIATE_SOLUTIONS)),
+                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS)),
                         strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.GENERIC),
@@ -289,6 +289,17 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
                 );
+            case "SaugmeconGlobalIntermediateNoGoodsPareto":
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        List.of(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON),
+                                strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
+                                strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS),
+                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS)),
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
+                );
             case "GIA_SumObj":
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
@@ -299,12 +310,23 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getFindSolution(FindSolutionType.GIA),
                         strategyFactory.getUpdateRegion(UpdateRegionType.GIA)
                 );
-            case "GIA_SumObjNoGoodSolution":
+            case "GIA_SumObjNoGoodPareto":
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
                         List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
                                 strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES),
-                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_INTERMEDIATE_SOLUTIONS)),
+                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS)),
+                        strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.GIA),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.GIA)
+                );
+            case "GIA_SumObjNoGoodAllFailsFirst":
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
+                                strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES),
+                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_ALL_FAILS_FIRST_THEN_ONLY_PARETO)),
                         strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.GIA),

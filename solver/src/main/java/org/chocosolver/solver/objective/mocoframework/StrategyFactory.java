@@ -41,8 +41,11 @@ public class StrategyFactory {
             case ADD_INTERMEDIATE_SOLUTIONS:
                 strategy = new AddIntermediateSolutionsPreprocessing();
                 break;
-            case NO_GOOD_ON_INTERMEDIATE_SOLUTIONS:
-                strategy = new NoGoodOnIntermediateSolution();
+            case NO_GOOD_ON_PARETO_FAILS:
+                strategy = new NoGoodOnIntermediateSolution(false);
+                break;
+            case NO_GOOD_ON_ALL_FAILS_FIRST_THEN_ONLY_PARETO:
+                strategy = new NoGoodOnIntermediateSolution(true);
                 break;
             case USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES:
                 strategy = new ObjectiveManagerWithObjLB();

@@ -54,6 +54,12 @@ public interface ISearchMonitorFactory extends ISelf<Solver> {
         ref().plugMonitor(new BufferedSolutionNogoodsForMOO(vars));
     }
 
+    default NogoodFromDominanceFails setNoGoodFromDominanceFails(IntVar[] vars, boolean learnFromNonObjectiveFails) {
+        NogoodFromDominanceFails monitorFails = new NogoodFromDominanceFails(ref().getModel(), vars, learnFromNonObjectiveFails);
+        ref().plugMonitor(monitorFails);
+        return monitorFails;
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
