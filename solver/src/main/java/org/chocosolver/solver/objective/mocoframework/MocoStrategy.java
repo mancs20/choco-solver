@@ -90,6 +90,9 @@ public class MocoStrategy {
             updateRegions.update(regionConstraints, archive, objectives, s, params);
             updatingTime += System.nanoTime() - startUpdating;
         }
+        if (!regionConstraints.isEmpty()) {
+            params.setExhaustive(false);
+        }
         System.out.printf("Total solving time: %.3fs%n", solvingTime / (1000f * 1000f * 1000f));
         System.out.printf("Total updating time: %.3fs%n", updatingTime / (1000f * 1000f * 1000f));
         List<String> recorderList = params.getRecorderList();
