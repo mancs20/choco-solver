@@ -67,7 +67,8 @@ public class BuilderModel {
         throw new IllegalArgumentException("Invalid benchmark: " + config.getBenchmark());
     }
 
-    public ModelObjectivesVariables createModel(int index) {
+    public ModelObjectivesVariables createModel(int index, boolean LCG) {
+        benchmarkReader.setUseLCG(LCG, index);
         return benchmarkReader.createModel(index);
     }
 }

@@ -9,8 +9,10 @@
  */
 package org.chocosolver.solver.objective;
 
+import org.chocosolver.sat.Reason;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
+import org.chocosolver.solver.constraints.Explained;
 import org.chocosolver.solver.constraints.Propagator;
 import org.chocosolver.solver.constraints.PropagatorPriority;
 import org.chocosolver.solver.exception.ContradictionException;
@@ -33,6 +35,7 @@ import java.util.List;
  * @author Jean-Guillaume Fages
  * @author Jani Simomaa
  */
+@Explained(comment = "must be tested")
 public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolution {
 
     //***********************************************************************************
@@ -171,15 +174,23 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
 //                    and one of them is already in the Pareto front, it is possible that another one is found and
 //                    replace the existing one in the front. This is counterproductive, as the code is designed to store
 //                    just one solution for each Pareto point.
+                    // todo check when dominates == 2 if the lower bound cannot be increased then get out
                     int currentPoint = sol[i] + 1;
                     if (tightestPoint < currentPoint) {
                         tightestPoint = currentPoint;
+                    }
+                    if (objectives[i].getLB() < tightestPoint) {
+                        break;
                     }
                 }
             }
             timeFindingTightestPoint += System.nanoTime() - __t0_finding_tightest_point;
             if (tightestPoint > Integer.MIN_VALUE) {
-                objectives[i].updateLowerBound(tightestPoint, this);
+                if (lcg()){
+                    objectives[i].updateLowerBound(tightestPoint, this, explainRaiseLB(i));
+                } else {
+                    objectives[i].updateLowerBound(tightestPoint, this);
+                }
             }
         }
     }
@@ -225,6 +236,19 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
             }
         }
         return dominates;
+    }
+
+    private Reason explainRaiseLB(int i) {
+        if (!lcg()) return Reason.undef();
+        int[] ps;
+        ps = new int[n];
+        int m = 1;
+        for (int j = 0; j < n; j++) {
+            if (j == i) continue;
+            ps[m++] = objectives[j].getMaxLit(); // (obj_j <= UB_j)
+        }
+        ps[0] = 0; // reserved slot / asserting lit placeholder
+        return Reason.r(ps);
     }
 
     @Override

@@ -767,6 +767,7 @@ public final class Solver implements ISolver, IMeasures, IOutputFactory {
         objectivemanager.resetBestBounds();
         if (isLCG()) {
             mSat.deleteAllLearnedClauses();
+//            mSat.deleteRemovableLearnedClauses();
         } else if (mModel.getHook(Model.MINISAT_HOOK_NAME) != null) {
             // todo : this is a workaround to not reset the state of the SAT solver, but it is not clean. We should have a better way to do that.
 //            mModel.getMinisat().getPropSat().reset();

@@ -97,6 +97,10 @@ public class Flatzinc extends RegParser {
         this.nb_cores = nb_cores;
     }
 
+    public void setLCG(boolean lcg) {
+        this.lcg = lcg;
+    }
+
     @Override
     public void createSettings() {
         defaultSettings = Settings.prod()
@@ -105,7 +109,7 @@ public class Flatzinc extends RegParser {
                 .setNbMaxLearntClauses(100_000)
                 //.setIntVarLazyLitWithWeakBounds(false)
                 .set("adhocReification", true)
-                .setWarnUser(false)
+                .setWarnUser(lcg)
         ;
     }
 

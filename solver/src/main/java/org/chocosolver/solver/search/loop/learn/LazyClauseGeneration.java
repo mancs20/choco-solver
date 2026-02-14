@@ -82,6 +82,9 @@ public class LazyClauseGeneration implements Learn {
     @Override
     public void init() {
         mSat.setRootLevel();
+        // reset counters for a new "fresh" search
+        nbSolutions = 0;
+        nbRestarts = 0;
     }
 
     @Override

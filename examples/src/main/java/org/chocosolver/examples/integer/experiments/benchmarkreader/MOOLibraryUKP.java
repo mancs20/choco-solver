@@ -52,7 +52,7 @@ public class MOOLibraryUKP extends BenchamarkReader implements ProblemUKP {
             constraintsWeights[i] = currentList.get(i);
         }
 
-        return implementKnapsackModel(getModelName(index), objectivesWeights, constraintsWeights, rhs);
+        return implementKnapsackModel(model, objectivesWeights, constraintsWeights, rhs);
     }
 
     public static Object[] readFile(String filePath) {

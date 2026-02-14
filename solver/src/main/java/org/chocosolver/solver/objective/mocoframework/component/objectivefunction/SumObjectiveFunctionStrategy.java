@@ -20,4 +20,9 @@ public class SumObjectiveFunctionStrategy implements ObjectiveFunctionStrategy{
         params.setObjectiveFunction(objectiveFunction);
         return sum;
     }
+
+    @Override
+    public boolean isNone() {
+        return false;
+    }
 }

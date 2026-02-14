@@ -48,7 +48,7 @@ public class Augmecon2 extends BenchamarkReader implements ProblemUKP {
             }
         }
 
-        return implementKnapsackModel(getModelName(index), objectivesDataArray, weightsLHS, weightConstraintUB);
+        return implementKnapsackModel(model, objectivesDataArray, weightsLHS, weightConstraintUB);
     }
 
     private List<int[]> readFromResources(String fileName) {

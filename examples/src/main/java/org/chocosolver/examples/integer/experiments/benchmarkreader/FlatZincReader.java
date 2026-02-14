@@ -25,10 +25,13 @@ public class FlatZincReader extends BenchamarkReader{
         Flatzinc fzn = new Flatzinc();
         try {
             if(fzn.setUp(filePath)) {
+                if (useLCG) {
+                    fzn.setLCG(true);
+                }
                 fzn.createSettings();
                 fzn.createSolver();
                 fzn.buildModel();
-                Model model = fzn.getModel();
+                model = fzn.getModel();
                 Datas[] datas = fzn.datas;
                 IntVar[] objectives = (IntVar[]) datas[0].get("objs");
                 if (objectives == null) {

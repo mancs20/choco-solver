@@ -5,9 +5,8 @@ import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.Task;
 
 public interface ProblemPermutationFlowshop {
-    default ModelObjectivesVariables implementFlowShopPermutation(String modelName, int[][] jobTaskDuration,
+    default ModelObjectivesVariables implementFlowShopPermutation(Model model, int[][] jobTaskDuration,
                                                                   int[] dueDates){
-        Model model = new Model(modelName);
         int nJobs = dueDates.length;
         int nTasks = jobTaskDuration[0].length;
         int minDuration = 0;

@@ -56,7 +56,6 @@ public class NQueenReader extends BenchamarkReader{
     }
 
     public ModelObjectivesVariables implementNQueenModel(String modelName, int n, int[][][] objs){
-        model = new Model(modelName);
         IntVar[] vars = new IntVar[n];
         IntVar[] diag1 = new IntVar[n];
         IntVar[] diag2 = new IntVar[n];

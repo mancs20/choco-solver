@@ -95,6 +95,6 @@ public class vOptLibUKP extends BenchamarkReader implements ProblemUKP {
             constraintsWeights[i] = currentList.get(i);
         }
 
-        return implementKnapsackModel(getModelName(index), objectivesWeights, constraintsWeights, rhs);
+        return implementKnapsackModel(model, objectivesWeights, constraintsWeights, rhs);
     }
 }
