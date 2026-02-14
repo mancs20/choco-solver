@@ -1,7 +1,7 @@
 /*
  * This file is part of choco-solver, http://choco-solver.org/
  *
- * Copyright (c) 2025, IMT Atlantique. All rights reserved.
+ * Copyright (c) 2026, IMT Atlantique. All rights reserved.
  *
  * Licensed under the BSD 4-clause license.
  *
@@ -88,7 +88,7 @@ public class SatDecorator extends MiniSat {
                 return;
             default:
                 Clause cr = new Clause(ps);
-                removeDominated(cr);
+                //removeDominated(cr);
                 dynClauses.add(cr);
                 attachClause(cr);
                 break;
