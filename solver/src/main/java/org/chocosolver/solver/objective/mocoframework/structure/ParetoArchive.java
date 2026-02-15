@@ -63,7 +63,7 @@ public class ParetoArchive {
      * by the new one.
      *
      */
-    public void addIntermediateSolutions() {
+    public Solution addIntermediateSolutions() {
         int[] vals = getSolutionObjVals();
         if (noSimilarSolutionInArchive(vals)) {
             Solution solution;
@@ -74,7 +74,9 @@ public class ParetoArchive {
             }
             solution.record();
             addSolutionToArchive(solution, vals);
+            return solution;
         }
+        return null;
     }
 
     private boolean noSimilarSolutionInArchive(int[] vals) {

@@ -93,13 +93,10 @@ public class GIAOptSumFindSolution extends AbstractFindSolutionStrategy {
 
     private void prepareSearchForNonDominatedSolutions(StrategyParams params) {
         params.getParetoMaximizer().setEnabled(true);
-        // todo uncomment later that we have test the simplest version
         if (params.getNogoodFromDominanceFails() != null) {
             params.getNogoodFromDominanceFails().setRefutedCanBeParetoDominated(true);
             if (params.isNoGoodsLearntFromNonObjectiveFails()) params.getNogoodFromDominanceFails().
                     setLearnFromNonObjectiveFails(true);
-//            params.getNogoodFromDominanceFails().setLearnFromNonObjectiveFails(true); // learning from all the fails
-//            is too slow, and the number of nodes explored is almost the same, but much slower
         }
     }
 

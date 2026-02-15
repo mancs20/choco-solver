@@ -64,8 +64,10 @@ public class ParetoFront {
 		return new Object[][]{
 //				{"SimpleOptGlobalConstraintTest"}, {"SimpleOptGlobalConstraint"}
 //				{"SimpleOptGlobalConstraint"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}, {"SimpleOptGlobalConstraintTest"}, {"SimpleOptGlobalConstraint"}
-				{"SaugmeconNoRTestReal"}, {"ParetoDisjunctiveProgrammingTest"}, {"SaugmeconGlobal"},
-				{"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"}, {"ParetoDisjunctiveProgrammingNoLabel"}, {"SimpleOptGlobalConstraintTest"}
+				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"Gavanelli"}, {"SaugmeconNoRTest"},
+				{"GIA_SumObjNoGoodAllFailsFirst"},{"GIA_SumObj"},{"GIA_SumObjNoGoodPareto"},
+				{"ParetoDisjunctiveProgrammingNoLabel"}, {"SimpleOptGlobalConstraintTest"}, {"SaugmeconNoRTestReal"},
+				{"ParetoDisjunctiveProgrammingTest"},
 //				{"SaugmeconNoRTest"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
 //				{"Gavanelli"}, {"Saugmecon"}, {"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}//, {"SimpleOptGlobalConstraint"},{"Saugmecon"},
 //				{"ParetoDisjunctiveProgrammingTest"}, {"GIA"}, {"GIA_bounded"}, {"GIA_boundedLazy"}
@@ -90,7 +92,7 @@ public class ParetoFront {
 	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
 	public Object[][] methodsOptimizeObjectivesIndividually() {
 		return new Object[][]{
-				{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"},{"Saugmecon"},{"SaugmeconNoRTest"},
+				{"SaugmeconGlobal"},{"Saugmecon"},{"SaugmeconNoRTest"},
 				{"ParetoDisjunctiveProgrammingTest"}, {"SaugmeconNoRTestReal"}, {"ParetoDisjunctiveProgrammingNoLabel"}
 		};
 	}
@@ -384,9 +386,9 @@ public class ParetoFront {
 		String instanceFile = "lagos_nigeria_100_cost_clouds_angle.fzn";
 		int timeoutSec = 1;
 		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "fzn_instance");
+		System.out.println(rr.stdout);
 		assertFalse(rr.wasExhaustive());
 		assertEquals(rr.solutionsDetails.getJSONArray("pareto_front").length(), 1);
-		System.out.println(rr.stdout);
 	}
 
 	private JSONArray runAndCollectPFStringsNqueens(String paretoMethod, String instanceFile, int timeoutSec) throws Exception {

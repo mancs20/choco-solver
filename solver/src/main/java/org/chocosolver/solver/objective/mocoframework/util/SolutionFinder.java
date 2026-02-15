@@ -31,11 +31,13 @@ public class SolutionFinder {
         }
 
         List<CounterSnapshot> snapshots = new ArrayList<>();
-        for (Criterion c : stop) {
-            if (c instanceof ICounter) {
-                snapshots.add(new CounterSnapshot((ICounter) c));
-            } else {
-                model.getSolver().addStopCriterion(c);
+        if (params.isOptimization() || params.isLexicographicOptimization()) {
+            for (Criterion c : stop) {
+                if (c instanceof ICounter) {
+                    snapshots.add(new CounterSnapshot((ICounter) c));
+                } else {
+                    model.getSolver().addStopCriterion(c);
+                }
             }
         }
 
@@ -44,13 +46,17 @@ public class SolutionFinder {
 
         long pre = model.getSolver().getSolutionCount();
         // recycle a solution from the pool of dominated solutions
-        Solution sol = archive.borrowDominatedSolutionFromPool();
+        Solution sol = null;
+        if (!addIntermediateSolutions) {
+            sol = archive.borrowDominatedSolutionFromPool();
+        }
         if (params.isOptimization()) {
-            optimizeObjectiveFunction(model, sol, archive, addIntermediateSolutions);
+            sol = optimizeObjectiveFunction(model, sol, archive, addIntermediateSolutions);
         } else if (params.isLexicographicOptimization()) {
-            lexicographicOptimization(model, sol, archive, addIntermediateSolutions, objectives, params.getLexicographicOptimizationOrder());
+            sol = lexicographicOptimization(model, sol, archive, addIntermediateSolutions, objectives, params.getLexicographicOptimizationOrder());
         } else {
             if (model.getSolver().solve()) {
+                assert sol != null;
                 sol.record();
             } else {
                 model.getSolver().removeStopCriterion(stop);
@@ -77,20 +83,25 @@ public class SolutionFinder {
 
         region.unpostConstraints(model);
         if (foundSolution) return sol;
-        archive.returnDominatedSolutionToPool(sol);
+        if (sol != null) {
+            archive.returnDominatedSolutionToPool(sol);
+        }
         return null;
     }
 
-    private void optimizeObjectiveFunction(Model model, Solution sol, ParetoArchive archive, boolean addIntermediateSolutions) {
+    private Solution optimizeObjectiveFunction(Model model, Solution sol, ParetoArchive archive, boolean addIntermediateSolutions) {
         while (model.getSolver().solve()) {
             if (addIntermediateSolutions) {
-                archive.addIntermediateSolutions();
+                Solution added = archive.addIntermediateSolutions();
+                if (added != null) sol = added;
+            } else {
+                sol.record();
             }
-            sol.record();
         }
+        return sol;
     }
 
-    private void lexicographicOptimization(Model model, Solution sol, ParetoArchive archive, boolean addIntermediateSolutions, IntVar[] objectives, int[] order) {
+    private Solution lexicographicOptimization(Model model, Solution sol, ParetoArchive archive, boolean addIntermediateSolutions, IntVar[] objectives, int[] order) {
 
         // todo put an order in the objectives and order them accordingly mobj[i] = model.neg(objectives[order[i]])
         // Lexicographic optimization
@@ -106,16 +117,18 @@ public class SolutionFinder {
         // 2. try to find a first solution
         while (model.getSolver().solve()) {
             if (addIntermediateSolutions) {
-                archive.addIntermediateSolutions();
+                Solution added = archive.addIntermediateSolutions();
+                if (added != null) sol = added;
+            } else {
+                sol.record();
             }
-            sol.record();
             // todo add a flag to params to indicate verbose and then use recorder. It is to show at every second
             //  the current archive
 //                recorder.onNewSolution(sol, objectives);
             // 3. extract values of each objective
             int[] bestFound = new int[objectives.length];
             for (int vIdx = 0; vIdx < objectives.length; vIdx++) {
-                bestFound[vIdx] = -sol.getIntVal(objectives[vIdx]);
+                bestFound[vIdx] = -objectives[vIdx].getValue();
 //                    bestFound[vIdx] = -sol.getIntVal(objectives[order[vIdx]]);
             }
             // 4. either update the constraint, or declare it if first solution
@@ -131,5 +144,6 @@ public class SolutionFinder {
         if (clint != null) {
             model.unpost(clint);
         }
+        return sol;
     }
 }
