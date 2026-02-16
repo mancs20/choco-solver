@@ -58,8 +58,6 @@ public class SolutionFinder {
             if (model.getSolver().solve()) {
                 assert sol != null;
                 sol.record();
-            } else {
-                model.getSolver().removeStopCriterion(stop);
             }
         }
         boolean foundSolution = model.getSolver().getSolutionCount() > pre;

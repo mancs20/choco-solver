@@ -8,19 +8,19 @@ import org.chocosolver.solver.objective.mocoframework.component.preprocessing.Pr
 import org.chocosolver.solver.objective.mocoframework.component.selectregion.SelectRegionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.updateregions.UpdateRegionsStrategy;
 
-import java.util.List;
+import java.util.ArrayList;
 
 public class StrategyComponents {
 
     private final InitialRegionStrategy initialRegion;
-    private final List<PreprocessingStrategy> preprocessing;
+    private final ArrayList<PreprocessingStrategy> preprocessing;
     private final ObjectiveFunctionStrategy objectiveFunction;
     private final SelectRegionStrategy selectRegion;
     private final FindNonDominatedSolutionStrategy findSolution;
     private final UpdateRegionsStrategy updateRegion;
 
     public StrategyComponents(InitialRegionStrategy initialRegion,
-                              List<PreprocessingStrategy> preprocessing,
+                              ArrayList<PreprocessingStrategy> preprocessing,
                               SelectRegionStrategy selectRegion,
                               FindNonDominatedSolutionStrategy findSolution,
                               UpdateRegionsStrategy updateRegion) {
@@ -28,7 +28,7 @@ public class StrategyComponents {
     }
 
     public StrategyComponents(InitialRegionStrategy initialRegion,
-                              List<PreprocessingStrategy> preprocessing,
+                              ArrayList<PreprocessingStrategy> preprocessing,
                               ObjectiveFunctionStrategy objectiveFunction,
                               SelectRegionStrategy selectRegion,
                               FindNonDominatedSolutionStrategy findSolution,
@@ -62,7 +62,7 @@ public class StrategyComponents {
         return initialRegion;
     }
 
-    public List<PreprocessingStrategy> getPreprocessing() {
+    public ArrayList<PreprocessingStrategy> getPreprocessing() {
         return preprocessing;
     }
 

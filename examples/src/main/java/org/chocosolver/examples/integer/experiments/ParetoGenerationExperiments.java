@@ -9,6 +9,7 @@ import org.chocosolver.solver.objective.IMultiObjectiveManager;
 import org.chocosolver.solver.objective.mocoframework.MocoStrategy;
 import org.chocosolver.solver.objective.mocoframework.StrategyComponents;
 import org.chocosolver.solver.objective.mocoframework.StrategyFactory;
+import org.chocosolver.solver.objective.mocoframework.component.preprocessing.PreprocessingStrategy;
 import org.chocosolver.solver.objective.mocoframework.enums.*;
 import org.chocosolver.solver.objective.mocoframework.structure.ParetoSolutionDetails;
 import org.chocosolver.solver.search.limits.TimeCounter;
@@ -112,7 +113,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 model.addHook("decisionVariables", decisionVariables);
             }
             model.addHook("objectives", objectives);
-            IMultiObjectiveManager.setDefaultSearchMultiObjective(model, objectives, modelAndObjectives.getDecisionVariablesSearch());
+            IMultiObjectiveManager.setDefaultSearchMultiObjective(model, objectives, modelAndObjectives.getDecisionVariablesSearch(), solverSearchStrategy);
             results = runFrontStrategy(model, objectives, frontGenerator, maximization, config.getSolverTimeoutSec());
             if (model.getSolver().isStopCriterionMet()){
                 System.out.println("Solver time limit reached");
@@ -231,102 +232,114 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
 
     private static StrategyComponents getStrategyComponentsFromKeyword(String keyword) {
         StrategyFactory strategyFactory = new StrategyFactory();
-
+        ArrayList<PreprocessingStrategy> preprocessingStrategies = new ArrayList<PreprocessingStrategy>();
         switch (keyword) {
             case "Gavanelli":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI)),
+                        preprocessingStrategies,
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.GENERIC),
                         strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
                 );
             case "SimpleOptGlobalConstraint":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
-                                strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS)),
+                        preprocessingStrategies,
                         strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.GENERIC),
                         strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
                 );
             case "SimpleOptGlobalConstraintNoGoodSolution":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
-                                strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS),
-                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS)),
+                        preprocessingStrategies,
                         strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.GENERIC),
                         strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
                 );
             case "Saugmecon":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON)),
+                        preprocessingStrategies,
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
                 );
             case "SaugmeconGlobal":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON),
-                                strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI)),
+                        preprocessingStrategies,
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
                 );
             case "SaugmeconGlobalIntermediate":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON),
-                                strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
-                                strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS)),
+                        preprocessingStrategies,
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
                 );
             case "SaugmeconGlobalIntermediateNoGoodsPareto":
+                // IMPORTANT: This combination does not wor for the moment. Pareto fails can be affected by constraints
+                // on the objectives, so it is not safe to add them as a nogood.
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON),
-                                strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
-                                strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS),
-                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS)),
+                        preprocessingStrategies,
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
                 );
             case "GIA_SumObj":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
-                                strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES)),
+                        preprocessingStrategies,
                         strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.GIA),
                         strategyFactory.getUpdateRegion(UpdateRegionType.GIA)
                 );
             case "GIA_SumObjNoGoodPareto":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
-                                strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES),
-                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS)),
+                        preprocessingStrategies,
                         strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.GIA),
                         strategyFactory.getUpdateRegion(UpdateRegionType.GIA)
                 );
             case "GIA_SumObjNoGoodAllFailsFirst":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_ALL_FAILS_FIRST_THEN_ONLY_PARETO));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        List.of(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI),
-                                strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES),
-                                strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_ALL_FAILS_FIRST_THEN_ONLY_PARETO)),
+                        preprocessingStrategies,
                         strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.GIA),

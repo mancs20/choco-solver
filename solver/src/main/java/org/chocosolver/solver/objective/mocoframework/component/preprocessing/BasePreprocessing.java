@@ -10,6 +10,7 @@ import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.criteria.Criterion;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -41,22 +42,32 @@ public abstract class BasePreprocessing implements PreprocessingStrategy {
             model.setObjective(true, objective);
             Solution opt = optimizer.find(model, archive, objectives, dummyRegion, params, stop);
             if (opt != null) {
-                Solution sol = opt.copySolution();
+                // if Pareto Global constraint is used, the solution returned by the optimizer is not necessarily the
+                // one corresponding to the ideal point, so we have to compare it with the one in the archive and take
+                // the best one for that objective
+                Solution sol;
+                if (params.getParetoMaximizer() != null && params.isAddIntermediateSolutions()) {
+                    sol = getIdealSolutionConsideringArchive(opt, archive, objectives, i);
+                } else {
+                    sol = opt.copySolution();
+                }
                 idealSolutions.add(sol);
                 idealValues.add(sol.getIntVal(objectives[i]));
             } else {
-                if (model.getSolver().isStopCriterionMet()) {
-                    for (int j = i; j < n; j++) {
-                        if (excludedObjectivesId.contains(j)) {
-                            continue;
-                        }
-                        idealValues.add(objectives[j].getLB());
-                        idealSolutions.add(null);
+                if (!model.getSolver().isStopCriterionMet()) {
+                    if (params.getParetoMaximizer() == null) {
+                        throw new RuntimeException("Preprocessing failed: unable to find ideal point. The problem should be feasible.");
+                    } else {
+                        // The Pareto front was found
+                        System.out.println("Preprocessing: Pareto front found while looking for ideal point of " +
+                                "the first " + i + " objectives without considering objectives " +
+                                Arrays.toString(excludedObjectivesId.toArray()) +
+                                ". Marking the search as exhaustive.");
+                        params.setExhaustive(true);
                     }
-                    break;
-                } else {
-                    throw new RuntimeException("Preprocessing failed: unable to find ideal point. The problem should be feasible.");
                 }
+                fillRemainingIdeals(i, objectives, excludedObjectivesId, idealValues, idealSolutions);
+                break;
             }
         }
         params.setIdealSolutions(idealSolutions.toArray(new Solution[0]));
@@ -65,6 +76,34 @@ public abstract class BasePreprocessing implements PreprocessingStrategy {
         }
         return idealValues.stream().mapToInt(Integer::intValue).toArray();
     }
+
+    private Solution getIdealSolutionConsideringArchive(Solution opt, ParetoArchive archive, IntVar[] objectives, int objectiveIndex) {
+        Solution bestSol = opt;
+        int bestValue = opt.getIntVal(objectives[objectiveIndex]);
+
+        List<int[]> frontVals = archive.getParetoFrontValues();
+        List<Solution> frontSols = archive.getParetoFrontSolutions();
+        for (int i = 0; i < frontVals.size(); i++) {
+            int objectiveVal = frontVals.get(i)[objectiveIndex];
+            if (objectiveVal > bestValue) {
+                bestValue = objectiveVal;
+                bestSol = frontSols.get(i);
+            }
+        }
+        return bestSol.copySolution();
+    }
+
+    private void fillRemainingIdeals(int startIdx, IntVar[] objectives, Set<Integer> excludedObjectivesId,
+                                     List<Integer> idealValues,
+                                     List<Solution> idealSolutions) {
+        int n = objectives.length;
+        for (int j = startIdx; j < n; j++) {
+            if (excludedObjectivesId.contains(j)) continue;
+            idealValues.add(objectives[j].getLB());
+            idealSolutions.add(null);
+        }
+    }
+
 
 
     protected int[] getNadirValues(IntVar[] objectives, Set<Integer> excludedObjectivesId, Criterion... stop) {

@@ -10,6 +10,7 @@ import org.chocosolver.solver.objective.mocoframework.component.findsolution.Fin
 import org.chocosolver.solver.objective.mocoframework.component.initialregion.InitialRegionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.objectivefunction.ObjectiveFunctionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.preprocessing.AddIntermediateSolutionsPreprocessing;
+import org.chocosolver.solver.objective.mocoframework.component.preprocessing.GavanelliPrepro;
 import org.chocosolver.solver.objective.mocoframework.component.preprocessing.PreprocessingStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.selectregion.SelectRegionStrategy;
 import org.chocosolver.solver.objective.mocoframework.component.updateregions.UpdateRegionsStrategy;
@@ -45,15 +46,30 @@ public class MocoStrategy {
         //convert to maximization problem
         objectives = Stream.of(objectives).map(o -> maximize ? o : model.neg(o)).toArray(IntVar[]::new);
         ParetoArchive archive = new ParetoArchive(objectives);
-        Set<Region> regionConstraints = initialRegion.computeInitialRegion(model, objectives);
+
         // preprocessing steps, could be a combination of multiple strategies
         StrategyParams params = new StrategyParams();
         params.setCheckIfNewSolutionDominates(true);
-        params.setExhaustive(true);
+        params.setExhaustive(false);
         boolean hasAddIntermediateSolutions =
                 preprocessingList.stream().anyMatch(p -> p instanceof AddIntermediateSolutionsPreprocessing);
         if (hasAddIntermediateSolutions) {
-            params.setAddIntermediateSolutions(true);
+            // do some preprocessing to be able to add intermediate solutions during the rest of the preprocessing steps
+            // Run these preprocessing first, in this order
+            List<Class<? extends PreprocessingStrategy>> first = List.of(
+                    AddIntermediateSolutionsPreprocessing.class,
+                    GavanelliPrepro.class
+            );
+            // 1) apply priority steps and remove them
+            for (Class<? extends PreprocessingStrategy> clazz : first) {
+                for (int i = 0; i < preprocessingList.size(); i++) {
+                    if (clazz.isInstance(preprocessingList.get(i))) {
+                        preprocessingList.get(i).apply(model, objectives, archive, params, stop);
+                        preprocessingList.remove(i); // safe: we won't use it again
+                        break;
+                    }
+                }
+            }
         }
 
         for (PreprocessingStrategy step: preprocessingList) {
@@ -76,6 +92,11 @@ public class MocoStrategy {
             params.setCheckIfNewSolutionDominates(false);
         }
 
+        Set<Region> regionConstraints = initialRegion.computeInitialRegion(model, objectives);
+        // check if the Pareto front was found in preprocessing steps. Unlikely but possible, especially if we added
+        // intermediate solutions and Pareto global constraint.
+        if (params.isExhaustive()) regionConstraints.clear();
+
         boolean checkDominanceWhenAdding;
         long solvingTime = 0L;
         long updatingTime = 0L;
@@ -86,13 +107,16 @@ public class MocoStrategy {
             solvingTime += System.nanoTime() - startSolving;
             checkDominanceWhenAdding = params.isAddIntermediateSolutions() || params.isCheckIfNewSolutionDominates();
             archive.add(s, checkDominanceWhenAdding);
-            long startUpdating = System.nanoTime();
-            updateRegions.update(regionConstraints, archive, objectives, s, params);
-            updatingTime += System.nanoTime() - startUpdating;
+            if (!model.getSolver().isStopCriterionMet()) {
+                long startUpdating = System.nanoTime();
+                // if the search was stopped during
+                // findSolution, the region is not updated and the loop will end because of the stop criterion,
+                // exhaustive = false
+                updateRegions.update(regionConstraints, archive, objectives, s, params);
+                updatingTime += System.nanoTime() - startUpdating;
+            }
         }
-        if (!regionConstraints.isEmpty()) {
-            params.setExhaustive(false);
-        }
+        params.setExhaustive(regionConstraints.isEmpty());
         System.out.printf("Total solving time: %.3fs%n", solvingTime / (1000f * 1000f * 1000f));
         System.out.printf("Total updating time: %.3fs%n", updatingTime / (1000f * 1000f * 1000f));
         List<String> recorderList = params.getRecorderList();

@@ -11,7 +11,6 @@ import org.chocosolver.solver.objective.mocoframework.component.updateregions.Up
 import org.chocosolver.solver.objective.mocoframework.enums.*;
 
 import java.util.ArrayList;
-import java.util.List;
 
 public class StrategyParser {
 
@@ -22,7 +21,7 @@ public class StrategyParser {
 
         String[] parts = strategyName.substring("MocoStrate-".length()).split("-");
         InitialRegionStrategy initialRegion = null;
-        List<PreprocessingStrategy> preprocessingList = new ArrayList<>();
+        ArrayList<PreprocessingStrategy> preprocessingList = new ArrayList<>();
         SelectRegionStrategy selectRegion = null;
         FindSolutionType findSolutionType = null;
         ObjectiveFunctionType objectiveFunctionType = null;

@@ -28,15 +28,13 @@ public interface IMultiObjectiveManager {
         return notObjectivesVars;
     }
 
-    static void setDefaultSearchMultiObjective(Model model, IntVar[] objectives, IntVar[] decisionVars) {
+    static void setDefaultSearchMultiObjective(Model model, IntVar[] objectives, IntVar[] decisionVars, String searchStrategy) {
         if (model.getSolver().getSearch() == null) {
             if (decisionVars.length == 0) {
                 IntVar[] notObjectivesVars = getNonObjectiveVariables(model, objectives);
-//                model.getSolver().setSearch(Search.minDomLBSearch(notObjectivesVars));
-                model.getSolver().setSearch(Search.domOverWDegSearch(notObjectivesVars));
+                setSearchMultiObjective(searchStrategy, model, notObjectivesVars);
             } else {
-//                model.getSolver().setSearch(Search.minDomLBSearch(decisionVars));
-                model.getSolver().setSearch(Search.domOverWDegSearch(decisionVars));
+                setSearchMultiObjective(searchStrategy, model, decisionVars);
             }
 
             //todo test
@@ -47,5 +45,14 @@ public interface IMultiObjectiveManager {
             //keep trying this one, saving the weights during gavanelli stage
 //            model.getSolver().setSearch(Search.domOverWDegSearch(vars));
         }
+    }
+
+    static void setSearchMultiObjective(String searchStrategy, Model model, IntVar[] decisionVars) {
+        if ("minDomLBSearch".equals(searchStrategy)) {
+            model.getSolver().setSearch(Search.minDomLBSearch(decisionVars));
+        } else {
+            model.getSolver().setSearch(Search.domOverWDegSearch(decisionVars));
+        }
+
     }
 }

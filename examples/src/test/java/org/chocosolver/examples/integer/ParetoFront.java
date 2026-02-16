@@ -92,7 +92,7 @@ public class ParetoFront {
 	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
 	public Object[][] methodsOptimizeObjectivesIndividually() {
 		return new Object[][]{
-				{"SaugmeconGlobal"},{"Saugmecon"},{"SaugmeconNoRTest"},
+				{"SaugmeconGlobal"},{"Saugmecon"},{"SaugmeconNoRTest"},{"SaugmeconGlobalIntermediate"},
 				{"ParetoDisjunctiveProgrammingTest"}, {"SaugmeconNoRTestReal"}, {"ParetoDisjunctiveProgrammingNoLabel"}
 		};
 	}
@@ -123,6 +123,7 @@ public class ParetoFront {
 		long t0 = System.nanoTime();
 		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "nqueens");
 		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+		System.out.println(rr.stdout);
 		testGeneralAspectsWhenTimeout(rr, elapsedMs, method, timeoutSec);
 	}
 
@@ -170,6 +171,18 @@ public class ParetoFront {
 	@Test(dataProvider = "methods", groups = "100s", timeOut = 100_000)
 	public void testParetoMethods(String method) throws Exception {
 		String instanceFile = "n_queens_p-5_q-8_ins-1.dat";
+		int timeoutSec = 10;
+		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest";
+		long t0 = System.nanoTime();
+		compareMethodsWithNqueen(baseMethodInComparisson, method, instanceFile, timeoutSec);
+		long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+		System.out.println("Method " + method + " compared to " + baseMethodInComparisson + " in "
+				+ elapsedMs + " ms.");
+	}
+
+	@Test(dataProvider = "methods", groups = "100s", timeOut = 100_000)
+	public void testParetoMethods2(String method) throws Exception {
+		String instanceFile = "n_queens_p-4_q-8_ins-8.dat";
 		int timeoutSec = 10;
 		String baseMethodInComparisson = "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest";
 		long t0 = System.nanoTime();
@@ -388,7 +401,11 @@ public class ParetoFront {
 		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "fzn_instance");
 		System.out.println(rr.stdout);
 		assertFalse(rr.wasExhaustive());
-		assertEquals(rr.solutionsDetails.getJSONArray("pareto_front").length(), 1);
+		if (method.equals("SaugmeconGlobalIntermediate")) {
+			assertTrue(rr.solutionsDetails.getJSONArray("pareto_front").length() > 1);
+		} else {
+			assertEquals(rr.solutionsDetails.getJSONArray("pareto_front").length(), 1);
+		}
 	}
 
 	private JSONArray runAndCollectPFStringsNqueens(String paretoMethod, String instanceFile, int timeoutSec) throws Exception {
