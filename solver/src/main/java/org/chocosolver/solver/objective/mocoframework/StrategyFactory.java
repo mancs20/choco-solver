@@ -120,6 +120,9 @@ public class StrategyFactory {
             case SAUGMECON:
                 strategy = new SaugmeconUpdate();
                 break;
+            case SAUGMECON_CONSTRAIN_MAIN_OBJECTIVE_UB:
+                strategy = new SaugmeconUpdateModifyUB();
+                break;
             case GIA:
                 strategy = new GIAUpdate();
                 break;

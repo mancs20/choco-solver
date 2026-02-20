@@ -275,6 +275,15 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
                 );
+            case "SaugmeconUB":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        preprocessingStrategies,
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON_CONSTRAIN_MAIN_OBJECTIVE_UB)
+                );
             case "SaugmeconGlobal":
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
@@ -295,6 +304,17 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
+                );
+            case "SaugmeconGlobalIntermediateUB":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        preprocessingStrategies,
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON_CONSTRAIN_MAIN_OBJECTIVE_UB)
                 );
             case "SaugmeconGlobalIntermediateNoGoodsPareto":
                 // IMPORTANT: This combination does not wor for the moment. Pareto fails can be affected by constraints
