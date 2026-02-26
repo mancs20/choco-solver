@@ -85,8 +85,9 @@ public class ParetoArchive {
         for (int i = paretoSolutions.size() - 1; i >= 0; i--) {
             archiveSolIsDominated = firstIsDominatedBySecond(paretoFront.get(i), vals);
             if (archiveSolIsDominated > 0) {
-                poolSols.add(paretoSolutions.remove(i));
+                Solution removed = paretoSolutions.remove(i); // could be null if it was seeded
                 paretoFront.remove(i);
+                if (removed != null) poolSols.add(removed);   // recycle only real solutions
             } else if (archiveSolIsDominated == 0) {
                 // is equal to a solution already in the archive
                 noSimilarSolution = false;
@@ -149,5 +150,9 @@ public class ParetoArchive {
     public void returnDominatedSolutionToPool(Solution s) {
         // caller guarantees 's' is not stored in paretoSolutions
         poolSols.add(s);
+    }
+
+    public List<int[]> getParetoFront() {
+        return paretoFront;
     }
 }

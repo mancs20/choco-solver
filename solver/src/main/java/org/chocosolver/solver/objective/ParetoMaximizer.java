@@ -179,7 +179,7 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
                     if (tightestPoint < currentPoint) {
                         tightestPoint = currentPoint;
                     }
-                    if (objectives[i].getLB() < tightestPoint) {
+                    if (!lcg() && objectives[i].getUB() < tightestPoint) {
                         break;
                     }
                 }

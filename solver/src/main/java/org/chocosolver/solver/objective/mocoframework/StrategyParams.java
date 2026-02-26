@@ -37,6 +37,8 @@ public class StrategyParams {
 
     // ────────────── Gavanelli-Specific Parameters ──────────────
     private ParetoMaximizer paretoMaximizer;
+    private boolean disableParetoMaximizerAfterFirstSolution = false;
+    public int objectiveValueToDisableParetoMaximizer = Integer.MIN_VALUE;
 
     // ────────────── No good on solutions and on restart ──────────────
     private boolean useNoGoodOnSolution = false;
@@ -193,5 +195,13 @@ public class StrategyParams {
 
     public boolean isNoGoodsLearntFromNonObjectiveFails() {
         return noGoodsLearntFromNonObjectiveFails;
+    }
+
+    public boolean isDisableParetoMaximizerAfterFirstSolution() {
+        return disableParetoMaximizerAfterFirstSolution;
+    }
+
+    public void setDisableParetoMaximizerAfterFirstSolution(boolean disableParetoMaximizerAfterFirstSolution) {
+        this.disableParetoMaximizerAfterFirstSolution = disableParetoMaximizerAfterFirstSolution;
     }
 }

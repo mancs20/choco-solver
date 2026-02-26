@@ -305,6 +305,28 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
                 );
+            case "SaugmeconGlobalIntermediateImproved":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.DISABLE_PARETO_MAXIMIZER_AFTER_FIRST_SOLUTION));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        preprocessingStrategies,
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON_INTERMEDIATE),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
+                );
+            case "SaugmeconGlobalIntermediateImprovedUB":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.DISABLE_PARETO_MAXIMIZER_AFTER_FIRST_SOLUTION));
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        preprocessingStrategies,
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON_INTERMEDIATE),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON_CONSTRAIN_MAIN_OBJECTIVE_UB)
+                );
             case "SaugmeconGlobalIntermediateUB":
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));

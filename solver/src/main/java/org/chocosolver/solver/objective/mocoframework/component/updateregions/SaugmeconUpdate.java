@@ -86,8 +86,7 @@ public class SaugmeconUpdate implements UpdateRegionsStrategy{
                 int[] fSolutionValues = previousSolutionInformation.get(idx).getSolution();
                 solutionWithMoreRelaxationFound = true;
                 if (previousSolutionInformation.get(idx).isFeasible()) {
-                    int[] fSolutionValuesForConstraint = Arrays.copyOfRange(fSolutionValues, 1, fSolutionValues.length);
-                    if (!solutionSatisfyEfArr(fSolutionValuesForConstraint, efArrayActual)) {
+                    if (!solutionSatisfyEfArr(fSolutionValues, efArrayActual)) {
                         solutionWithMoreRelaxationFound = false;
                         idx -= 1;
                     }
@@ -112,8 +111,8 @@ public class SaugmeconUpdate implements UpdateRegionsStrategy{
 
     private static boolean solutionSatisfyEfArr(int[] solutionValues, int[] efArray) {
         boolean satisfy = true;
-        for (int i = 0; i < solutionValues.length; i++) {
-            if (solutionValues[i] < efArray[i]) {
+        for (int i = 0; i < efArray.length; i++) {
+            if (solutionValues[i+1] < efArray[i]) {
                 satisfy = false;
                 break;
             }

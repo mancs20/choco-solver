@@ -10,7 +10,6 @@ import org.chocosolver.solver.objective.mocoframework.structure.Region;
 import org.chocosolver.solver.variables.IntVar;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -111,8 +110,7 @@ public class SaugmeconUpdateModifyUB implements UpdateRegionsStrategy {
                 int[] fSolutionValues = previousSolutionInformation.get(idx).getSolution();
                 solutionWithMoreRelaxationFound = true;
                 if (previousSolutionInformation.get(idx).isFeasible()) {
-                    int[] fSolutionValuesForConstraint = Arrays.copyOfRange(fSolutionValues, 1, fSolutionValues.length);
-                    if (!solutionSatisfyEfArr(fSolutionValuesForConstraint, efArrayActual)) {
+                    if (!solutionSatisfyEfArr(fSolutionValues, efArrayActual)) {
                         solutionWithMoreRelaxationFound = false;
                         idx -= 1;
                         // next solution have a less or equal value for the main objective, if not it means it dominates the current solution, which is impossible as it is Pareto point
@@ -141,8 +139,8 @@ public class SaugmeconUpdateModifyUB implements UpdateRegionsStrategy {
 
     private static boolean solutionSatisfyEfArr(int[] solutionValues, int[] efArray) {
         boolean satisfy = true;
-        for (int i = 0; i < solutionValues.length; i++) {
-            if (solutionValues[i] < efArray[i]) {
+        for (int i = 0; i < efArray.length; i++) {
+            if (solutionValues[i+1] < efArray[i]) {
                 satisfy = false;
                 break;
             }

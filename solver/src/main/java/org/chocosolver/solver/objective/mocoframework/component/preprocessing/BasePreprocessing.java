@@ -33,6 +33,9 @@ public abstract class BasePreprocessing implements PreprocessingStrategy {
             objectiveFunctionInParamsArg = false;
         }
 
+        boolean disableParetoMaximizerAfterFirstSolution = params.isDisableParetoMaximizerAfterFirstSolution();
+        params.setDisableParetoMaximizerAfterFirstSolution(false);
+
         Model model = objectives[0].getModel();
         for (int i = 0; i < n; i++) {
             if (excludedObjectivesId.contains(i)) {
@@ -74,6 +77,7 @@ public abstract class BasePreprocessing implements PreprocessingStrategy {
         if (!objectiveFunctionInParamsArg) {
             params.setUseOptimization(false);
         }
+        params.setDisableParetoMaximizerAfterFirstSolution(disableParetoMaximizerAfterFirstSolution);
         return idealValues.stream().mapToInt(Integer::intValue).toArray();
     }
 

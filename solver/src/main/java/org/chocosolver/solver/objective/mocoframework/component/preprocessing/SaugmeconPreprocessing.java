@@ -37,14 +37,11 @@ public class SaugmeconPreprocessing extends BasePreprocessing {
         params.setRwv(idealValues.clone());
         params.setCheckIfNewSolutionDominates(false);
 
-        Constraint objectiveFunction = null;
-        if(validateIdealNadir(idealValues, nadirValues)){
-            objectiveFunction = setSaugmeconObjective(model, objectives);
-        }
-        if (objectiveFunction != null) {
-            params.setObjectiveFunction(objectiveFunction);
-        } else {
-            params.setLexicographicOptimizationOrder(objOrder);
+        params.setLexicographicOptimizationOrder(objOrder);
+        model.clearObjective();
+        // constraint objectives
+        for (int i = 0; i < idealValues.length; i++) {
+            model.arithm(objectives[i + 1], "<=", idealValues[i]).post();
         }
     }
 

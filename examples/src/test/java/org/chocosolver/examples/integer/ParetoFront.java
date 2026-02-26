@@ -63,7 +63,7 @@ public class ParetoFront {
 	public Object[][] methods() {
 		return new Object[][]{
 				{"Gavanelli"},
-				{"SaugmeconUB"},{"SaugmeconGlobalIntermediateUB"},{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"SaugmeconNoRTest"},{"SaugmeconNoRTestReal"},
+				{"SaugmeconGlobalIntermediateImprovedUB"},{"SaugmeconGlobalIntermediateImproved"},{"SaugmeconUB"},{"SaugmeconGlobalIntermediateUB"},{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"SaugmeconNoRTest"},{"SaugmeconNoRTestReal"},
 				{"GIA_SumObjNoGoodAllFailsFirst"},{"GIA_SumObj"},{"GIA_SumObjNoGoodPareto"},
 				{"ParetoDisjunctiveProgrammingNoLabel"},{"ParetoDisjunctiveProgrammingTest"},
 				{"SimpleOptGlobalConstraintTest"},{"SimpleOptGlobalConstraint"}
@@ -74,7 +74,7 @@ public class ParetoFront {
 	@DataProvider(name = "methodsMaximize")
 	public Object[][] methodsMaximize() {
 		return new Object[][]{
-			{"SaugmeconUB"},{"SaugmeconGlobalIntermediateUB"},{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"SaugmeconNoRTest"},{"SaugmeconNoRTestReal"},
+			{"SaugmeconGlobalIntermediateImprovedUB"},{"SaugmeconGlobalIntermediateImproved"},{"SaugmeconUB"},{"SaugmeconGlobalIntermediateUB"},{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"SaugmeconNoRTest"},{"SaugmeconNoRTestReal"},
 			{"SimpleOptGlobalConstraintTest"},
 			{"ParetoDisjunctiveProgrammingNoLabel"}
 		};
@@ -90,7 +90,7 @@ public class ParetoFront {
 	@DataProvider(name = "methodsOptimizeObjectivesIndividually")
 	public Object[][] methodsOptimizeObjectivesIndividually() {
 		return new Object[][]{
-				{"SaugmeconUB"},{"SaugmeconGlobalIntermediateUB"},{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"SaugmeconNoRTest"},{"SaugmeconNoRTestReal"},
+				{"SaugmeconGlobalIntermediateImprovedUB"},{"SaugmeconGlobalIntermediateImproved"},{"SaugmeconUB"},{"SaugmeconGlobalIntermediateUB"},{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"SaugmeconNoRTest"},{"SaugmeconNoRTestReal"},
 				{"ParetoDisjunctiveProgrammingTest"}, {"ParetoDisjunctiveProgrammingNoLabel"}
 		};
 	}
@@ -399,7 +399,7 @@ public class ParetoFront {
 		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "fzn_instance");
 		System.out.println(rr.stdout);
 		assertFalse(rr.wasExhaustive());
-		if (method.equals("SaugmeconGlobalIntermediate") || method.equals("SaugmeconGlobalIntermediateUB")) {
+		if (method.equals("SaugmeconGlobalIntermediate") || method.equals("SaugmeconGlobalIntermediateUB") || method.equals("SaugmeconGlobalIntermediateImproved")) {
 			assertTrue(rr.solutionsDetails.getJSONArray("pareto_front").length() > 1);
 		} else {
 			assertEquals(rr.solutionsDetails.getJSONArray("pareto_front").length(), 1);

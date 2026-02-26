@@ -33,7 +33,10 @@ public class StrategyFactory {
         PreprocessingStrategy strategy;
         switch (type) {
             case GAVANELLI:
-                strategy = new GavanelliPrepro();
+                strategy = new GavanelliPrepro(false);
+                break;
+            case DISABLE_PARETO_MAXIMIZER_AFTER_FIRST_SOLUTION:
+                strategy = new GavanelliPrepro(true);
                 break;
             case SAUGMECON:
                 strategy = new SaugmeconPreprocessing(this.sharedSolutionFinder);
@@ -93,6 +96,9 @@ public class StrategyFactory {
                 break;
             case SAUGMECON:
                 strategy = new SaugmeconFindSolution(this.sharedSolutionFinder);
+                break;
+            case SAUGMECON_INTERMEDIATE:
+                strategy = new SaugmeconIntermediateFindSolution(this.sharedSolutionFinder);
                 break;
             case GIA:
                 strategy = new GIAOptSumFindSolution(this.sharedSolutionFinder);

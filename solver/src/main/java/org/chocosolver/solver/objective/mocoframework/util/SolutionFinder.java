@@ -20,6 +20,7 @@ import static org.chocosolver.solver.search.SearchState.STOPPED;
 
 public class SolutionFinder {
     private int solverCallsCount;
+    private boolean disableParetoMaximizerAfterFirstSolution = false;
 
     public SolutionFinder() {
         solverCallsCount = 0;
@@ -41,6 +42,8 @@ public class SolutionFinder {
             }
         }
 
+        disableParetoMaximizerAfterFirstSolution = params.isDisableParetoMaximizerAfterFirstSolution();
+
         region.postConstraints();
         boolean addIntermediateSolutions = params.isAddIntermediateSolutions();
 
@@ -53,7 +56,7 @@ public class SolutionFinder {
         if (params.isOptimization()) {
             sol = optimizeObjectiveFunction(model, sol, archive, addIntermediateSolutions);
         } else if (params.isLexicographicOptimization()) {
-            sol = lexicographicOptimization(model, sol, archive, addIntermediateSolutions, objectives, params.getLexicographicOptimizationOrder());
+            sol = lexicographicOptimization(model, sol, archive, addIntermediateSolutions, objectives, params);
         } else {
             if (model.getSolver().solve()) {
                 assert sol != null;
@@ -99,8 +102,10 @@ public class SolutionFinder {
         return sol;
     }
 
-    private Solution lexicographicOptimization(Model model, Solution sol, ParetoArchive archive, boolean addIntermediateSolutions, IntVar[] objectives, int[] order) {
+    private Solution lexicographicOptimization(Model model, Solution sol, ParetoArchive archive,
+                                               boolean addIntermediateSolutions, IntVar[] objectives, StrategyParams params) {
 
+        boolean paretoMaximizerDisabled = false;
         // todo put an order in the objectives and order them accordingly mobj[i] = model.neg(objectives[order[i]])
         // Lexicographic optimization
         Constraint clint = null;
@@ -129,6 +134,12 @@ public class SolutionFinder {
                 bestFound[vIdx] = -objectives[vIdx].getValue();
 //                    bestFound[vIdx] = -sol.getIntVal(objectives[order[vIdx]]);
             }
+
+            if (!paretoMaximizerDisabled && disableParetoMaximizerAfterFirstSolution && -bestFound[0] > params.objectiveValueToDisableParetoMaximizer) {
+                params.getParetoMaximizer().setEnabled(false);
+                paretoMaximizerDisabled = true;
+            }
+
             // 4. either update the constraint, or declare it if first solution
             if (plint != null) {
                 plint.update(bestFound, true);
@@ -141,6 +152,9 @@ public class SolutionFinder {
         }
         if (clint != null) {
             model.unpost(clint);
+        }
+        if (paretoMaximizerDisabled) {
+            params.getParetoMaximizer().setEnabled(true);
         }
         return sol;
     }

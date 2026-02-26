@@ -14,6 +14,12 @@ import org.chocosolver.util.criteria.Criterion;
  */
 public class GavanelliPrepro implements PreprocessingStrategy {
 
+    final private boolean disableAfterFirstSolution;
+
+    public GavanelliPrepro(boolean disableAfterFirstSolution) {
+        this.disableAfterFirstSolution = disableAfterFirstSolution;
+    }
+
     @Override
     public void apply(Model model, IntVar[] objectives, ParetoArchive paretoArchive, StrategyParams params, Criterion... stop) {
         // Post the Pareto Global constraint to filter dominated regions
@@ -22,5 +28,6 @@ public class GavanelliPrepro implements PreprocessingStrategy {
         Constraint paretoGlobal = new Constraint("ParetoGlobal", pareto);
         paretoGlobal.post();
         params.setParetoMaximizer(pareto);
+        params.setDisableParetoMaximizerAfterFirstSolution(disableAfterFirstSolution);
     }
 }
