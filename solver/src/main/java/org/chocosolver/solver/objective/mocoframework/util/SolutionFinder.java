@@ -21,6 +21,9 @@ import static org.chocosolver.solver.search.SearchState.STOPPED;
 public class SolutionFinder {
     private int solverCallsCount;
     private boolean disableParetoMaximizerAfterFirstSolution = false;
+    UpdatablePropagator<int[]> plint = null;
+    private int[] bestLexFound = null;
+    private IntVar[] mobj = null;
 
     public SolutionFinder() {
         solverCallsCount = 0;
@@ -108,14 +111,24 @@ public class SolutionFinder {
         boolean paretoMaximizerDisabled = false;
         // todo put an order in the objectives and order them accordingly mobj[i] = model.neg(objectives[order[i]])
         // Lexicographic optimization
-        Constraint clint = null;
-        UpdatablePropagator<int[]> plint = null;
+        // set best lex array to the lower bound and deactivate the propagator until a first solution is obtained
+        if (bestLexFound == null) {
+            bestLexFound = new int[objectives.length];
+        } else {
+            for (int vIdx = 0; vIdx < objectives.length; vIdx++) {
+                bestLexFound[vIdx] = -objectives[vIdx].getLB();
+            }
+            plint.update(bestLexFound, false);
+            ((PropLexInt) plint).setEnabled(false);
+        }
         // 1. copy objective variables and transform it if necessary
-        IntVar[] mobj = new IntVar[objectives.length];
-        for (int i = 0; i < objectives.length; i++) {
-            //todo delete the commented line once tested
-            mobj[i] = model.neg(objectives[i]);
+        if (mobj == null) {
+            mobj = new IntVar[objectives.length];
+            for (int i = 0; i < objectives.length; i++) {
+                //todo delete the commented line once tested
+                mobj[i] = model.neg(objectives[i]);
 //                mobj[i] = model.neg(objectives[order[i]]);
+            }
         }
         // 2. try to find a first solution
         while (model.getSolver().solve()) {
@@ -129,29 +142,26 @@ public class SolutionFinder {
             //  the current archive
 //                recorder.onNewSolution(sol, objectives);
             // 3. extract values of each objective
-            int[] bestFound = new int[objectives.length];
             for (int vIdx = 0; vIdx < objectives.length; vIdx++) {
-                bestFound[vIdx] = -objectives[vIdx].getValue();
-//                    bestFound[vIdx] = -sol.getIntVal(objectives[order[vIdx]]);
+                bestLexFound[vIdx] = -objectives[vIdx].getValue();
             }
 
-            if (!paretoMaximizerDisabled && disableParetoMaximizerAfterFirstSolution && -bestFound[0] > params.objectiveValueToDisableParetoMaximizer) {
+            if (!paretoMaximizerDisabled && disableParetoMaximizerAfterFirstSolution && -bestLexFound[0] > params.objectiveValueToDisableParetoMaximizer) {
                 params.getParetoMaximizer().setEnabled(false);
                 paretoMaximizerDisabled = true;
             }
 
             // 4. either update the constraint, or declare it if first solution
             if (plint != null) {
-                plint.update(bestFound, true);
+                // enabled the propagator for lexicographic optimization if not already done
+                ((PropLexInt) plint).setEnabled(true);
+                plint.update(bestLexFound, true);
             } else {
-                plint = new PropLexInt(mobj, bestFound, true, true);
+                plint = new PropLexInt(mobj, bestLexFound, true, true);
                 //noinspection unchecked
-                clint = new Constraint("lex objectives", (Propagator<IntVar>) plint);
+                Constraint clint = new Constraint("lex objectives", (Propagator<IntVar>) plint);
                 clint.post();
             }
-        }
-        if (clint != null) {
-            model.unpost(clint);
         }
         if (paretoMaximizerDisabled) {
             params.getParetoMaximizer().setEnabled(true);
