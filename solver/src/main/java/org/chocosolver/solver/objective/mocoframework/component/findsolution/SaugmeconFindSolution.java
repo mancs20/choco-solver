@@ -29,7 +29,7 @@ public class SaugmeconFindSolution extends AbstractFindSolutionStrategy{
 
         Solution solution = solutionFinder.find(model, archive, objectives, region, params, stop);
         if (solution == null) {
-            saveSolutionInformation(epsilonArr, null,  previousSolutionInformation, null);
+            saveSolutionInformation(epsilonArr, null,  previousSolutionInformation);
         } else {
             int[] solutionObjectiveValues = new int[objectives.length];
             for (int i = 0; i < objectives.length; i++) {
@@ -43,15 +43,15 @@ public class SaugmeconFindSolution extends AbstractFindSolutionStrategy{
                     archive.setCanAddSolution(true);
                 }
             }
-            saveSolutionInformation(epsilonArr, solutionObjectiveValues,  previousSolutionInformation, solution);
+            saveSolutionInformation(epsilonArr, solutionObjectiveValues,  previousSolutionInformation);
         }
 
         return solution;
     }
 
-    private static void saveSolutionInformation(int[] efArrayActual, int[] solutionObjectiveValues, List<SolutionEpsilonArrayInformation> previousSolutionInformation, Solution solverSolution) {
+    private static void saveSolutionInformation(int[] efArrayActual, int[] solutionObjectiveValues, List<SolutionEpsilonArrayInformation> previousSolutionInformation) {
         boolean feasible = solutionObjectiveValues != null;
-        SolutionEpsilonArrayInformation solutionEfArrayInformation = new SolutionEpsilonArrayInformation(solutionObjectiveValues, efArrayActual.clone(), feasible, solverSolution);
+        SolutionEpsilonArrayInformation solutionEfArrayInformation = new SolutionEpsilonArrayInformation(solutionObjectiveValues, efArrayActual.clone(), feasible);
         previousSolutionInformation.add(solutionEfArrayInformation);
     }
 }

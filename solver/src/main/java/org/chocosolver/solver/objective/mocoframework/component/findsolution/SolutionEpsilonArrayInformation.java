@@ -1,26 +1,31 @@
 package org.chocosolver.solver.objective.mocoframework.component.findsolution;
 
-import org.chocosolver.solver.Solution;
+import java.util.Collections;
+import java.util.List;
 
 public class SolutionEpsilonArrayInformation {
-    private final int[] solution;
+    private final List<int[]> solutions;
     private final int[] epsilonArr;
     private final boolean feasible;
-    private final Solution solverSolution;
 
-    public SolutionEpsilonArrayInformation(int[] solution, int[] epsilonArr, boolean feasible, Solution solverSolution) {
-        this.solution = solution;
+    public SolutionEpsilonArrayInformation(int[] solution, int[] epsilonArr, boolean feasible) {
+        this.solutions = Collections.singletonList(solution);
         this.epsilonArr = epsilonArr;
         this.feasible = feasible;
-        this.solverSolution = solverSolution;
+    }
+
+    public SolutionEpsilonArrayInformation(List<int[]> solutions, int[] epsilonArr, boolean feasible) {
+        this.solutions = solutions;
+        this.epsilonArr = epsilonArr;
+        this.feasible = feasible;
     }
 
     public int[] getSolution() {
-        return solution;
+        return solutions.get(0);
     }
 
-    public Solution getSolverSolution() {
-        return solverSolution;
+    public List<int[]> getSolutions() {
+        return solutions;
     }
 
     public int[] getEfArray() {

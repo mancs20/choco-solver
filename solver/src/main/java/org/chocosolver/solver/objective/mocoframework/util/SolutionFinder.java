@@ -146,7 +146,7 @@ public class SolutionFinder {
                 bestLexFound[vIdx] = -objectives[vIdx].getValue();
             }
 
-            if (!paretoMaximizerDisabled && disableParetoMaximizerAfterFirstSolution && -bestLexFound[0] > params.objectiveValueToDisableParetoMaximizer) {
+            if (!paretoMaximizerDisabled && disableParetoMaximizerAfterFirstSolution && bestLexFound[0] < params.objectiveValueToDisableParetoMaximizer) {
                 params.getParetoMaximizer().setEnabled(false);
                 paretoMaximizerDisabled = true;
             }
