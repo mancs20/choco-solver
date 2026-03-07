@@ -55,7 +55,6 @@ public abstract class AbstractSaugmeconUpdate implements UpdateRegionsStrategy {
         while (!regions.isEmpty()) {
             updateEpsilon(epsilonArr, solutionObjValues, objectives, params);
             if (ideal[ideal.length - 1] >= epsilonArr[epsilonArr.length - 1]) {
-//                SolutionEpsilonArrayInformation previousSolutionInfo = previousSolutionSatisfyCurrentEpsilon(epsilonArr, params);
                 int[] idsPreviousSolutionInfo = previousSolutionSatisfyCurrentEpsilon(epsilonArr, params);
                 if (idsPreviousSolutionInfo[0] == -1) {
                     // no previous solution process satisfies the current epsilon values
@@ -63,7 +62,6 @@ public abstract class AbstractSaugmeconUpdate implements UpdateRegionsStrategy {
                     onAfterUpdateRegionConstraints(objectives[0]);
                     break;
                 } else if (idsPreviousSolutionInfo[1] != -1) {
-//                    solutionObjValues = previousSolutionInfo.getSolution();
                     solutionObjValues = params.getPreviousSolutionInfo().get(idsPreviousSolutionInfo[0]).getSolutions().get(idsPreviousSolutionInfo[1]);
                 } else {
                     solutionObjValues = null;

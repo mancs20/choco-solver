@@ -2,6 +2,7 @@ package org.chocosolver.solver.objective.mocoframework.component.findsolution;
 
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
+import org.chocosolver.solver.objective.ParetoMaximizer;
 import org.chocosolver.solver.objective.mocoframework.StrategyParams;
 import org.chocosolver.solver.objective.mocoframework.structure.ParetoArchive;
 import org.chocosolver.solver.objective.mocoframework.structure.Region;
@@ -28,6 +29,7 @@ public class SaugmeconIntermediateFindSolution extends AbstractFindSolutionStrat
         //solution information
         List<SolutionEpsilonArrayInformation> previousSolutionInformation = params.getPreviousSolutionInfo();
         ParetoArchive localArchive = new ParetoArchive(objectives);
+        findAllArchivePointsForEpsilon(epsilonArr, archive, localArchive, params);
 
         // The version below aims to find only solutions that are better than the best solution in the sub-archive
         // (archive solutions affecting the current epsilon) for the main objective, which is the first objective
@@ -95,5 +97,49 @@ public class SaugmeconIntermediateFindSolution extends AbstractFindSolutionStrat
             globalArchive.add(sLoc, /*checkDominanceWhenAdding=*/true);
         }
         return solutionsToAddToEpsilon;
+    }
+
+    private void findAllArchivePointsForEpsilon(int[] epsilonArr, ParetoArchive globalArchive, ParetoArchive localArchive,
+                                                              StrategyParams params) {
+        final int p = 0; // main objective in lexicographic optimization
+
+        int bestP = Integer.MIN_VALUE;
+
+        List<int[]> gf = globalArchive.getParetoFrontValues();
+        ArrayList<Integer> idx = new ArrayList<>();
+
+        for (int i = 0; i < gf.size(); i++) {
+            int[] z = gf.get(i);
+            if (inRegion(z, epsilonArr)) {
+                idx.add(i);
+                int zp = z[p];
+                if (zp > bestP) {
+                    bestP = zp;
+                }
+            }
+        }
+
+        for (int i : idx) {
+            localArchive.getParetoFront().add(gf.get(i));
+            localArchive.getParetoFrontSolutions().add(null);
+        }
+
+        // wire ParetoMaximizer to local lists (so addIntermediateSolutions() updates what propagates)
+        ParetoMaximizer pareto = params.getParetoMaximizer();
+        if (pareto != null) {
+            pareto.setSharedFront(localArchive.getParetoFrontSolutions(), localArchive.getParetoFrontValues());
+        }
+
+        params.objectiveValueToDisableParetoMaximizer = bestP;
+    }
+
+    // region defined by lower bounds on objectives[1..] using epsilonArr[0..]
+    private static boolean inRegion(int[] objVals, int[] epsilonArr) {
+        // objVals length == objectives length
+        // epsilonArr length == objectives.length - 1
+        for (int i = 1; i < objVals.length; i++) {
+            if (objVals[i] < epsilonArr[i - 1]) return false;
+        }
+        return true;
     }
 }
