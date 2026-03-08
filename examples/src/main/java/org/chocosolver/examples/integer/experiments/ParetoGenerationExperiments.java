@@ -488,6 +488,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
             System.out.println(e.getMessage());
             System.out.println("Error while adding total solver stats to json object");
         }
+        orderedMap.put("subproblems_solved", solverMessages.length);
 
         // Get the hypervolume, the pareto front and the solutions of the problem
         ParetoFrontProcessor paretoFront = new ParetoFrontProcessor(solutions.toArray(new Solution[0]),

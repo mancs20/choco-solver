@@ -47,7 +47,7 @@ public class SaugmeconIntermediateFindSolution extends AbstractFindSolutionStrat
         if (solution == null) {
             // no solution in this region
             saveSolutionInformation(epsilonArr, null,  previousSolutionInformation);
-            posByValsRef.clear();
+            promoteAllNonCertifiedSeedsInRegion(archive);
         } else {
             archive.setCanAddSolution(true);
             int[] solutionObjectiveValues = new int[objectives.length];
@@ -186,5 +186,21 @@ public class SaugmeconIntermediateFindSolution extends AbstractFindSolutionStrat
             if (objVals[i] < epsilonArr[i - 1]) return false;
         }
         return true;
+    }
+
+    private void promoteAllNonCertifiedSeedsInRegion(ParetoArchive globalArchive) {
+        while (!posByValsRef.isEmpty()) {
+            Iterator<Map.Entry<int[], Integer>> it = posByValsRef.entrySet().iterator();
+            Map.Entry<int[], Integer> e = it.next();
+            int idx = e.getValue();
+            int[] swappedIntoIdx = globalArchive.promoteToCertified(idx);
+            it.remove();
+            if (swappedIntoIdx != null) {
+                Integer moved = posByValsRef.get(swappedIntoIdx);
+                if (moved != null) {
+                    posByValsRef.put(swappedIntoIdx, idx);
+                }
+            }
+        }
     }
 }

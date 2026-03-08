@@ -399,7 +399,7 @@ public class ParetoFront {
 		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "fzn_instance");
 		System.out.println(rr.stdout);
 		assertFalse(rr.wasExhaustive());
-		if (method.equals("SaugmeconGlobalIntermediate") || method.equals("SaugmeconGlobalIntermediateUB") || method.equals("SaugmeconGlobalIntermediateImproved")) {
+		if (method.startsWith("SaugmeconGlobalIntermediate")) {
 			assertTrue(rr.solutionsDetails.getJSONArray("pareto_front").length() > 1);
 		} else {
 			assertEquals(rr.solutionsDetails.getJSONArray("pareto_front").length(), 1);
