@@ -10,15 +10,16 @@ import org.chocosolver.solver.objective.mocoframework.util.SolutionFinder;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.util.criteria.Criterion;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class SaugmeconIntermediateFindSolution extends AbstractFindSolutionStrategy{
 
     private int mainObjectiveObtainedValue;
+    private final IdentityHashMap<int[], Integer> posByValsRef;
 
     public SaugmeconIntermediateFindSolution(SolutionFinder solutionFinder) {
         super(solutionFinder);
+        posByValsRef = new IdentityHashMap<>();
     }
 
     @Override
@@ -46,6 +47,7 @@ public class SaugmeconIntermediateFindSolution extends AbstractFindSolutionStrat
         if (solution == null) {
             // no solution in this region
             saveSolutionInformation(epsilonArr, null,  previousSolutionInformation);
+            posByValsRef.clear();
         } else {
             archive.setCanAddSolution(true);
             int[] solutionObjectiveValues = new int[objectives.length];
@@ -79,7 +81,9 @@ public class SaugmeconIntermediateFindSolution extends AbstractFindSolutionStrat
         List<Solution> localSols = localArchive.getParetoFrontSolutions();
         List<int[]> localVals = localArchive.getParetoFrontValues();
         List<int[]> solutionsToAddToEpsilon = new ArrayList<>();
+        List<Solution> newLocalSolutions = new ArrayList<>();
 
+        globalArchive.setCanAddSolution(true);
         for (int i = 0; i < localSols.size(); i++) {
             Solution sLoc = localSols.get(i);
 
@@ -88,14 +92,50 @@ public class SaugmeconIntermediateFindSolution extends AbstractFindSolutionStrat
                 if (valsLoc[0] > mainObjectiveObtainedValue) {
                     mainObjectiveObtainedValue = valsLoc[0];
                     solutionsToAddToEpsilon.add(valsLoc);
+                    Integer gIdx = posByValsRef.get(valsLoc);
+                    if (gIdx != null) {
+                        int idxGlobal = gIdx;
+                        int[] swappedIntoIdx = globalArchive.promoteToCertified(idxGlobal);
+                        if (swappedIntoIdx != null) {
+                            Integer moved = posByValsRef.get(swappedIntoIdx);
+                            if (moved != null) {
+                                posByValsRef.put(swappedIntoIdx, idxGlobal);
+                            }
+                        }
+                    }
                 }
+                // remove the solution from the posByValsRef to know that should be kept in global archive
+                posByValsRef.remove(valsLoc);
                 continue;
             }
-
-            if (sLoc == optimalSolution) continue;
-
-            globalArchive.add(sLoc, /*checkDominanceWhenAdding=*/true);
+            newLocalSolutions.add(sLoc);
         }
+
+        while (!posByValsRef.isEmpty()) {
+            Iterator<Map.Entry<int[], Integer>> it = posByValsRef.entrySet().iterator();
+            Map.Entry<int[], Integer> e = it.next();
+            int idx = e.getValue();
+            int[] swappedIntoIdx = globalArchive.removeAtSwap(idx);
+            it.remove();
+            if (swappedIntoIdx != null) {
+                Integer moved = posByValsRef.get(swappedIntoIdx);
+                if (moved != null) {
+                    posByValsRef.put(swappedIntoIdx, idx);
+                }
+            }
+        }
+
+        // add the optimal solution to the global archive as certified
+        globalArchive.addCertified(optimalSolution);
+
+        // now add new local solutions
+        for (Solution sLoc : newLocalSolutions) {
+            if (sLoc != optimalSolution) {
+                globalArchive.add(sLoc, /*checkDominanceWhenAdding=*/true);
+            }
+        }
+
+        globalArchive.setCanAddSolution(false);
         return solutionsToAddToEpsilon;
     }
 
@@ -120,8 +160,13 @@ public class SaugmeconIntermediateFindSolution extends AbstractFindSolutionStrat
         }
 
         for (int i : idx) {
-            localArchive.getParetoFront().add(gf.get(i));
-            localArchive.getParetoFrontSolutions().add(null);
+            if (i < globalArchive.getCertifiedSize()) {
+                localArchive.addCertified(null, gf.get(i));
+            } else {
+                posByValsRef.put(gf.get(i), i);
+                localArchive.getParetoFront().add(gf.get(i));
+                localArchive.getParetoFrontSolutions().add(null);
+            }
         }
 
         // wire ParetoMaximizer to local lists (so addIntermediateSolutions() updates what propagates)

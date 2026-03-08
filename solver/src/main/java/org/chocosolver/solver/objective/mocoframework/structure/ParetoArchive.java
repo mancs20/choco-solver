@@ -17,6 +17,9 @@ public class ParetoArchive {
     private final List<Solution> poolSols = new ArrayList<>();
     private final Model model;
 
+    // number of Pareto optimal solutions in the archive
+    private int certifiedSize = 0;
+
     public ParetoArchive(IntVar[] objectives) {
         this.objectives = objectives;
         this.paretoFront = new ArrayList<>();
@@ -79,10 +82,36 @@ public class ParetoArchive {
         return null;
     }
 
+    /**
+     * Add a solution to the archive that is guaranteed to be Pareto optimal
+     * @param solution new solution to add to the archive
+     * @param vals objective values of the solution
+     */
+    public void addCertified(Solution solution, int[] vals) {
+        if (noSimilarSolutionInArchive(vals)) {
+            addSolutionToArchive(solution, vals);
+            swap(certifiedSize, paretoSolutions.size() - 1);
+            certifiedSize++;
+        }
+    }
+
+    public void addCertified(Solution solution) {
+        int[] vals = getSolutionObjVals(solution);
+        addCertified(solution, vals);
+    }
+
+    public int[] promoteToCertified(int idx) {
+        if (idx < certifiedSize) return null;
+        int target = certifiedSize;
+        swap(idx, target);
+        certifiedSize++;
+        return (idx == target) ? null : paretoFront.get(idx);
+    }
+
     private boolean noSimilarSolutionInArchive(int[] vals) {
         int archiveSolIsDominated;
         boolean noSimilarSolution = true;
-        for (int i = paretoSolutions.size() - 1; i >= 0; i--) {
+        for (int i = paretoSolutions.size() - 1; i >= certifiedSize; i--) {
             archiveSolIsDominated = firstIsDominatedBySecond(paretoFront.get(i), vals);
             if (archiveSolIsDominated > 0) {
                 Solution removed = paretoSolutions.remove(i); // could be null if it was seeded
@@ -154,5 +183,34 @@ public class ParetoArchive {
 
     public List<int[]> getParetoFront() {
         return paretoFront;
+    }
+
+    public int[] removeAtSwap(int idx) {
+        int last = paretoSolutions.size() - 1;
+        if (idx < certifiedSize || idx > last) {
+            throw new IndexOutOfBoundsException("idx=" + idx + "certifiedSize=" + certifiedSize + ", size=" + paretoSolutions.size());
+        }
+        if (idx != last) {
+            swap(idx, last);
+        }
+        Solution removed = paretoSolutions.remove(last);
+        paretoFront.remove(last);
+        if (removed != null) poolSols.add(removed);
+        return (idx == last) ? null : paretoFront.get(idx);
+    }
+
+    private void swap(int i, int j) {
+        if (i == j) return;
+        Solution si = paretoSolutions.get(i);
+        paretoSolutions.set(i, paretoSolutions.get(j));
+        paretoSolutions.set(j, si);
+
+        int[] vi = paretoFront.get(i);
+        paretoFront.set(i, paretoFront.get(j));
+        paretoFront.set(j, vi);
+    }
+
+    public int getCertifiedSize() {
+        return certifiedSize;
     }
 }
