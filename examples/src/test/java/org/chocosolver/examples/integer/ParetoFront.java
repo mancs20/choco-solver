@@ -114,6 +114,28 @@ public class ParetoFront {
 		}
 	}
 
+	@Test(groups = "45s", timeOut = 45_000)
+	public void testOutPutForAllProblems () throws Exception {
+		String instanceFileName[] = new String[] {"n_queens_p-2_q-14_ins-4.dat", "KP_p-5_n-10_ins-10.dat",
+				"paris_30_cost_clouds.fzn", "J30_12_9.fzn"};
+		String benchmark[] = new String[] {"powa","MOOLibrary","powa","powa"};
+		String problem[] = new String[] {"nqueens","UKP","fzn_instance","fzn_instance"};
+
+		String method = "Gavanelli";
+		int timeoutSec = 10;
+		for (int i = 0; i < instanceFileName.length; i++) {
+			RunResult rr = getOrRun(method, instanceFileName[i], timeoutSec, benchmark[i], problem[i]);
+			System.out.println(rr.stdout);
+			String messageToCheck = rr.solverMessages.get(0);
+			if (messageToCheck != null && messageToCheck.toLowerCase().contains("solutions")) {
+				assertTrue(rr.solutionsDetails.getJSONArray("pareto_front").length() > 0,
+						"Expected some points in the pareto front when timeout happens");
+				assertTrue(rr.solutionsDetails.getJSONArray("solutions_pareto_front").length() > 0,
+						"Expected some solutions in the Pareto set when timeout happens");
+			}
+		}
+	}
+
 	@Test(dataProvider = "methods", groups = "10s", timeOut = 10_000)
 	public void testParetoWhenTimeoutHappens(String method) throws Exception {
 		String instanceFile = "n_queens_p-2_q-14_ins-4.dat";
