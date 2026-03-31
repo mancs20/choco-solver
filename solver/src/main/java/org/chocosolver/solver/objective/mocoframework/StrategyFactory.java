@@ -38,6 +38,9 @@ public class StrategyFactory {
             case DISABLE_PARETO_MAXIMIZER_AFTER_FIRST_SOLUTION:
                 strategy = new GavanelliPrepro(true);
                 break;
+            case DISJUNCTIVE_ALG:
+                strategy = new DisjunctivePreprocessing(this.sharedSolutionFinder);
+                break;
             case SAUGMECON:
                 strategy = new SaugmeconPreprocessing(this.sharedSolutionFinder);
                 break;

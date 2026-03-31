@@ -4,5 +4,6 @@ public enum UpdateRegionType {
     GAVANELLI,
     SAUGMECON,
     SAUGMECON_CONSTRAIN_MAIN_OBJECTIVE_UB,
-    GIA
+    GIA,
+    DISJUNCTIVE
 }

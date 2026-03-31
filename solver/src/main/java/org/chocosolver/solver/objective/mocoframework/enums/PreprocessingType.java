@@ -3,6 +3,7 @@ package org.chocosolver.solver.objective.mocoframework.enums;
 public enum PreprocessingType {
     GAVANELLI,
     SAUGMECON,
+    DISJUNCTIVE_ALG,
     ADD_INTERMEDIATE_SOLUTIONS,
     DISABLE_PARETO_MAXIMIZER_AFTER_FIRST_SOLUTION,
     NO_GOOD_ON_PARETO_FAILS,
