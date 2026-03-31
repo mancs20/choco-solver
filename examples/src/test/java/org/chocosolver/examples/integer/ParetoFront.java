@@ -65,7 +65,7 @@ public class ParetoFront {
 				{"Gavanelli"},
 				{"SaugmeconGlobalIntermediateImprovedUB"},{"SaugmeconGlobalIntermediateImproved"},{"SaugmeconUB"},{"SaugmeconGlobalIntermediateUB"},{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"SaugmeconNoRTest"},{"SaugmeconNoRTestReal"},
 				{"GIA_SumObjNoGoodAllFailsFirst"},{"GIA_SumObj"},{"GIA_SumObjNoGoodPareto"},
-				{"ParetoDisjunctiveProgrammingNoLabel"},{"ParetoDisjunctiveProgrammingTest"},
+				{"DisjProg"},{"ParetoDisjunctiveProgrammingNoLabel"},{"ParetoDisjunctiveProgrammingTest"},
 				{"SimpleOptGlobalConstraintTest"},{"SimpleOptGlobalConstraint"}
 //				{"ParetoGavanelliGlobalConstraintNoEvolutionInfoTest"}
 		};
@@ -76,7 +76,7 @@ public class ParetoFront {
 		return new Object[][]{
 			{"SaugmeconGlobalIntermediateImprovedUB"},{"SaugmeconGlobalIntermediateImproved"},{"SaugmeconUB"},{"SaugmeconGlobalIntermediateUB"},{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"SaugmeconNoRTest"},{"SaugmeconNoRTestReal"},
 			{"SimpleOptGlobalConstraintTest"},
-			{"ParetoDisjunctiveProgrammingNoLabel"}
+			{"ParetoDisjunctiveProgrammingNoLabel"},{"DisjProg"}
 		};
 	}
 
@@ -91,7 +91,7 @@ public class ParetoFront {
 	public Object[][] methodsOptimizeObjectivesIndividually() {
 		return new Object[][]{
 				{"SaugmeconGlobalIntermediateImprovedUB"},{"SaugmeconGlobalIntermediateImproved"},{"SaugmeconUB"},{"SaugmeconGlobalIntermediateUB"},{"SaugmeconGlobal"}, {"SaugmeconGlobalIntermediate"}, {"Saugmecon"}, {"SaugmeconNoRTest"},{"SaugmeconNoRTestReal"},
-				{"ParetoDisjunctiveProgrammingTest"}, {"ParetoDisjunctiveProgrammingNoLabel"}
+				{"ParetoDisjunctiveProgrammingTest"}, {"ParetoDisjunctiveProgrammingNoLabel"}, {"DisjProg"}
 		};
 	}
 
@@ -256,6 +256,7 @@ public class ParetoFront {
 		String instanceFile = "paris_30_cost_clouds.fzn";
 		int timeoutSec = 2000;
 		RunResult rr = getOrRun(method, instanceFile, timeoutSec, "powa", "fzn_instance");
+		System.out.println(rr.stdout);
 		// check if the objective is MAximized
 		String messageToCheck = rr.solverMessages.get(0);
 		assertTrue(messageToCheck.contains("MAXIMIZE"), "MAXIMIZE should be present in the solver messages indicating maximization and not MINIMIZATION " + messageToCheck);
