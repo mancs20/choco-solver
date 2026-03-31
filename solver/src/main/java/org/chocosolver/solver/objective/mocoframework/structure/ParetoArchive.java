@@ -3,6 +3,8 @@ package org.chocosolver.solver.objective.mocoframework.structure;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.variables.IntVar;
+import org.chocosolver.solver.variables.Variable;
+import org.chocosolver.util.tools.ArrayUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +18,7 @@ public class ParetoArchive {
     // Allow to recycle (dominated) Solution objects
     private final List<Solution> poolSols = new ArrayList<>();
     private final Model model;
+    private final Variable[] varsToStore;
 
     // number of Pareto optimal solutions in the archive
     private int certifiedSize = 0;
@@ -26,6 +29,14 @@ public class ParetoArchive {
         this.paretoSolutions = new ArrayList<>();
         canAddSolution = true;
         model = this.objectives[0].getModel();
+
+        Variable[] decisionVars = (Variable[]) model.getHook("decisionVariables");
+        if (decisionVars != null) {
+            this.varsToStore = ArrayUtils.append(decisionVars, objectives);
+        } else {
+            System.out.println("No decision variables hooked in the model. Saving only objectives in the model");
+            this.varsToStore = objectives;
+        }
     }
 
     public List<Solution> getParetoFrontSolutions() {
@@ -71,7 +82,7 @@ public class ParetoArchive {
         if (noSimilarSolutionInArchive(vals)) {
             Solution solution;
             if (poolSols.isEmpty()) {
-                solution = new Solution(model);
+                solution = createNewSolution();
             } else {
                 solution = poolSols.remove(poolSols.size() - 1);
             }
@@ -170,7 +181,7 @@ public class ParetoArchive {
 
     public Solution borrowDominatedSolutionFromPool() {
         if (poolSols.isEmpty()) {
-            return new Solution(model);
+            return createNewSolution();
         }
         // take from the end (cheaper remove)
         return poolSols.remove(poolSols.size() - 1);
@@ -212,5 +223,9 @@ public class ParetoArchive {
 
     public int getCertifiedSize() {
         return certifiedSize;
+    }
+
+    private Solution createNewSolution() {
+        return new Solution(model, varsToStore);
     }
 }
