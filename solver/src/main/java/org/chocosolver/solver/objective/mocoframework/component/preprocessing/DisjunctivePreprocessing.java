@@ -23,13 +23,16 @@ public class DisjunctivePreprocessing extends BasePreprocessing {
         Set<Integer> excludedObjectives = new HashSet<>();
         idealValues = getIdealValues(objectives, archive, excludedObjectives, params, stop);
         params.setIdealPoint(idealValues);
+        int[] nadirValues = getNadirValues(objectives, excludedObjectives, stop);
+        params.setNadirPoint(nadirValues);
         params.setCheckIfNewSolutionDominates(false);
         model.clearObjective();
         // constraint objectives
         for (int i = 0; i < idealValues.length; i++) {
-            model.arithm(objectives[i + 1], "<=", idealValues[i]).post();
+            model.arithm(objectives[i], "<=", idealValues[i]).post();
         }
         prepareObjectiveFunction(objectives, model);
+        params.setUseOptimization(true);
     }
 
     private void prepareObjectiveFunction(IntVar[] objectives, Model model) {

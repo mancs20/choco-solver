@@ -30,15 +30,20 @@ public class DisjunctiveUpdate implements UpdateRegionsStrategy{
             return;
         }
 
-        if (objectives != null) {
+        if (this.objectives == null) {
             this.objectives = objectives;
+            int[] initialRegion = new int[objectives.length];
+            for (int i = 0; i < objectives.length; i++) {
+                initialRegion[i] = params.getNadirPoint()[i] - 1;
+            }
+            feasibleRegions.add(new DisjunctiveRegion(initialRegion, params));
         }
 
         updateRegions(solution, params);
         if (feasibleRegions.isEmpty()) {
             regions.clear();
         } else {
-            selectRegionToExplore(regions);
+            selectRegionToExplore(regions, params);
         }
     }
 
@@ -47,28 +52,28 @@ public class DisjunctiveUpdate implements UpdateRegionsStrategy{
             infeasibleRegions.add(exploredRegion);
             feasibleRegions.remove(exploredRegion);
         } else {
-            feasibleRegions = getAllNewRegions(feasibleRegions, solution);
+            feasibleRegions = getAllNewRegions(feasibleRegions, solution, params);
             filterDominatingRegions(feasibleRegions);
             discardInfeasibleRegions(params);
         }
     }
 
-    private List<DisjunctiveRegion> getAllNewRegions(List<DisjunctiveRegion> feasibleRegions, Solution solution) {
+    private List<DisjunctiveRegion> getAllNewRegions(List<DisjunctiveRegion> feasibleRegions, Solution solution, StrategyParams params) {
         List<DisjunctiveRegion> newRegions = new ArrayList<>();
         int[] objectivesValues = solutionToObjectivesValues(solution);
         for (DisjunctiveRegion region: feasibleRegions){
-            newRegions.addAll(combineRegionWithSolution(region.v, objectivesValues));
+            newRegions.addAll(combineRegionWithSolution(region.v, objectivesValues, params));
         }
         return newRegions;
     }
 
-    private List<DisjunctiveRegion> combineRegionWithSolution(int[] region, int[] objectivesValues) {
+    private List<DisjunctiveRegion> combineRegionWithSolution(int[] region, int[] objectivesValues, StrategyParams params) {
         List<DisjunctiveRegion> newRegions = new ArrayList<>();
         for (int i = 0; i < objectives.length; i++) {
             int[] newRegion = new int[region.length];
             System.arraycopy(region,0, newRegion, 0, region.length);
             newRegion[i] = Math.max(objectivesValues[i], region[i]);
-            newRegions.add(new DisjunctiveRegion(newRegion, objectives));
+            newRegions.add(new DisjunctiveRegion(newRegion, params));
         }
         return newRegions;
     }
@@ -134,7 +139,7 @@ public class DisjunctiveUpdate implements UpdateRegionsStrategy{
         infeasibleRegions.addAll(toAddToInfeasible);
     }
 
-    private void selectRegionToExplore(Set<Region> regions) {
+    private void selectRegionToExplore(Set<Region> regions, StrategyParams params) {
         int idBestRegion = 0;
         float bestScore = Float.NEGATIVE_INFINITY;
         int rSize = feasibleRegions.size();
@@ -145,8 +150,8 @@ public class DisjunctiveUpdate implements UpdateRegionsStrategy{
             float score = 0f;
 
             for (int k = 0; k < objectives.length; k++) {
-                lb = objectives[k].getLB();
-                ub = objectives[k].getUB();
+                lb = params.getNadirPoint()[k];
+                ub = params.getIdealPoint()[k];
                 if (ub > lb) {
                     float slack = (ub - region.v[k]) / (float) (ub - lb);
                     score += slack;
@@ -168,12 +173,12 @@ public class DisjunctiveUpdate implements UpdateRegionsStrategy{
         if (region.hasConstraints()) {
             List<Constraint> regionConstraints = region.getConstraints();
             for (int i = 0; i < objectives.length; i++) {
-                regionConstraints.set(i, model.arithm(objectives[i], ">=", disjunctiveRegion.v[i]));
+                regionConstraints.set(i, model.arithm(objectives[i], ">", disjunctiveRegion.v[i]));
             }
         } else {
             List<Constraint> constraints = new ArrayList<>();
             for (int i = 0; i < objectives.length; i++) {
-                constraints.add(model.arithm(objectives[i], ">=", disjunctiveRegion.v[i]));
+                constraints.add(model.arithm(objectives[i], ">", disjunctiveRegion.v[i]));
             }
             region.setConstraints(constraints);
         }
@@ -195,15 +200,16 @@ final class DisjunctiveRegion {
     final int[] v;
     private final int hash;
 
-    DisjunctiveRegion(int[] values, IntVar[] objectives) {
-        this.v = new int[objectives.length];
-        if (values.length < objectives.length) {
+    DisjunctiveRegion(int[] values, StrategyParams params) {
+        int p = params.getIdealPoint().length;
+        this.v = new int[p];
+        if (values.length < p) {
             System.arraycopy(values, 0, this.v, 0, values.length);
-            for (int i = values.length; i < objectives.length; i++) {
-                this.v[i] = objectives[i].getLB() - 1;
+            for (int i = values.length; i < p; i++) {
+                this.v[i] = params.getNadirPoint()[i] - 1;
             }
         } else {
-            System.arraycopy(values, 0, this.v, 0, objectives.length);
+            System.arraycopy(values, 0, this.v, 0, p);
         }
         this.hash = Arrays.hashCode(v);  // cached
     }

@@ -135,6 +135,9 @@ public class StrategyFactory {
             case GIA:
                 strategy = new GIAUpdate();
                 break;
+            case DISJUNCTIVE:
+                strategy = new DisjunctiveUpdate();
+                break;
             default:
                 throw new IllegalArgumentException("Unknown UpdateRegionType: " + type);
         }
