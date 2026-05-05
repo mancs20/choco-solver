@@ -1,10 +1,8 @@
 package org.chocosolver.examples.integer.experiments;
 
-import org.chocosolver.examples.integer.*;
 import org.chocosolver.examples.integer.experiments.benchmarkreader.ModelObjectivesVariables;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
-import org.chocosolver.solver.objective.GiaConfig;
 import org.chocosolver.solver.objective.IMultiObjectiveManager;
 import org.chocosolver.solver.objective.mocoframework.MocoStrategy;
 import org.chocosolver.solver.objective.mocoframework.StrategyComponents;
@@ -32,16 +30,14 @@ import org.json.JSONObject;
  *     problem: the name of the problem to be used. (e.g. "ukp" (multiobjective unidimensional knapsack), "sims")
  *     instance: the name of the instance to be used. (e.g. "100u1" for augmecon2, "2KP50-1A" for vOptLib)
  *     instancePath: the path to the instance file
- *     solverSearchStrategy: the name of the solver search strategy to be used, for now it is "default", but it could be "LNS"
+ *     solverSearchStrategy: the name of the solver search strategy to be used, for now it is "default" to represent "domOverWDegSearch"
  *     solverTimeoutSec: the maximum time in seconds that the solver will run
  *     frontGenerator: the name of the front generator to be used, it could be "GIA" (versions: GIA, GIA_bounded, GIA_boundedLazy, BiObjGIA_sparsity, BiObjGIA_sparsityBounded, BiObjGIA_regionImplementation),
- *     "ParetoGavanelliGlobalConstraint", "Saugmecon", "SaugmeconFrontVerify", "ParetoDisjunctiveProgramming"
+ *     "MOBAB-CP", "SAUGMECON", "PAUGMECON"
  *     threads: the number of threads to be used, the default is 1
  *
  *     Examples:
- *     vOptLib ukp 2KP50-1A /Users/manuel.combarrosimon/choco-solver/bench/2KP50-1A.dat portfolio 14400 BiObjGIA_regionImplementation 6
- *     vOptLib ukp 2KP50-1A ../vOptLib/ukp/2KP50-1A.dat default 14400 BiObjGIA_regionImplementation
- *     augmecon2 ukp 100u /Users/manuel.combarrosimon/choco-solver/bench/2KP50-1A.dat default 3600 BiObjGIA_regionImplementation
+ *     MOOLibrary ukp KP_p-4_n-30_ins-2 </folder_instances/>KP_p-4_n-30_ins-2.dat default 3600 MOBAB-CP
  *
  */
 
@@ -80,22 +76,19 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
             portfolioSize = config.getThreads();
         }
 
-        boolean test = false;
         ModelObjectivesVariables[] modelAndObjectivesArray = new ModelObjectivesVariables[portfolioSize];
         ModelObjectivesVariables modelAndObjectives;
-        if (test) {
-            modelAndObjectives = createExampleModel(config);
-        }else{
-            BuilderModel builderModel = new BuilderModel(config);
-            for (int i = 0; i < portfolioSize; i++) {
-                if (solverSearchStrategy.equalsIgnoreCase("lcg")) {
-                    modelAndObjectivesArray[i] = builderModel.createModel(i, true);
-                } else {
-                    modelAndObjectivesArray[i] = builderModel.createModel(i, false);
-                }
+
+        BuilderModel builderModel = new BuilderModel(config);
+        for (int i = 0; i < portfolioSize; i++) {
+            if (solverSearchStrategy.equalsIgnoreCase("lcg")) {
+                modelAndObjectivesArray[i] = builderModel.createModel(i, true);
+            } else {
+                modelAndObjectivesArray[i] = builderModel.createModel(i, false);
             }
-            modelAndObjectives = modelAndObjectivesArray[0];
         }
+        modelAndObjectives = modelAndObjectivesArray[0];
+
         IntVar[] objectives = modelAndObjectives.getObjectives();
         Object[] decisionVariables = modelAndObjectives.getDecisionVariables();
         boolean maximization = modelAndObjectives.isMaximization();
@@ -105,23 +98,20 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
         }
 
         Object[] results;
-        // todo find a way to know if it was exhaustive or not when portfolio is used
         boolean exhaustive = true;
-        if (portfolioSize == 1) {
-            Model model = modelAndObjectives.getModel();
-            if (decisionVariables != null && decisionVariables.length > 0) {
-                model.addHook("decisionVariables", decisionVariables);
-            }
-            model.addHook("objectives", objectives);
-            IMultiObjectiveManager.setDefaultSearchMultiObjective(model, objectives, modelAndObjectives.getDecisionVariablesSearch(), solverSearchStrategy);
-            results = runFrontStrategy(model, objectives, frontGenerator, maximization, config.getSolverTimeoutSec());
-            if (model.getSolver().isStopCriterionMet()){
-                System.out.println("Solver time limit reached");
-                exhaustive = false;
-            }
-        } else {
-            results = runFrontStrategyWithPortfolio(modelAndObjectivesArray, frontGenerator, maximization, config.getSolverTimeoutSec());
+        Model model = modelAndObjectives.getModel();
+
+        if (decisionVariables != null && decisionVariables.length > 0) {
+            model.addHook("decisionVariables", decisionVariables);
         }
+        model.addHook("objectives", objectives);
+        IMultiObjectiveManager.setDefaultSearchMultiObjective(model, objectives, modelAndObjectives.getDecisionVariablesSearch(), solverSearchStrategy);
+        results = runFrontStrategy(model, objectives, frontGenerator, maximization, config.getSolverTimeoutSec());
+        if (model.getSolver().isStopCriterionMet()){
+            System.out.println("Solver time limit reached");
+            exhaustive = false;
+        }
+
         boolean cumulativeStats = checkIfStatsAreCumulative(frontGenerator);
 
         outputProcessResults(results, exhaustive, objectives, originalObjectives, decisionVariables, maximization, cumulativeStats);
@@ -130,34 +120,6 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
         System.out.println("Ending experiment with benchmark:" + benchmark + ", problem:" + config.getProblem() +
                 ", instance:" + config.getInstance() + ", frontGenerator:" + frontGenerator + ", solverSearchStrategy:" +
                 solverSearchStrategy + ", solverTimeoutSec:" + solverTimeoutSec);
-    }
-    private static ModelObjectivesVariables createExampleModel(Config config) {
-        Model model = new Model(config.getModelName());
-        // We handle 4 types of food, described below
-        int[] nbItems = new int[]{5, 2, 6, 7}; // number of items for each type
-        int[] weights = new int[]{5, 8, 7, 8}; // weight of an item for each type
-        int[] lipids = new int[]{5, 9, 8, 1}; // quantity of lipids of the item
-        int[] glucose = new int[]{9, 5, 7, 32}; // quantity of glucose of the item
-
-        // For each type, we create a variable for the number of occurrences
-        IntVar[] occurrences = new IntVar[nbItems.length];
-        for (int i = 0; i < nbItems.length; i++) {
-            occurrences[i] = model.intVar(0, nbItems[i]);
-        }
-
-        // Total weight of the solution.
-        IntVar weight = model.intVar(0, 80);
-        // Total of lipids
-        IntVar totalLipids = model.intVar(0, 200);
-        // Total of glucose
-        IntVar totalGlucose = model.intVar(0, 200);
-
-        // We add two knapsack constraints to the solver
-        // Beware : call the post() method to save it
-        model.knapsack(occurrences, weight, totalLipids, weights, lipids).post();
-        model.knapsack(occurrences, weight, totalGlucose, weights, glucose).post();
-
-        return new ModelObjectivesVariables(model, new IntVar[]{totalLipids, totalGlucose}, occurrences, true);
     }
 
     private static Object[] runWithElapsedTime(Supplier<Object[]> action) {
@@ -176,65 +138,20 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
     }
 
     private static Object[] runFrontStrategy(Model model, IntVar[] objectives, String frontGenerator, boolean maximize, int timeoutSec) {
-//        model.getSolver().limitTime(timeoutSec + "s");
         return runWithElapsedTime(() -> {
-            if (frontGenerator.contains("GIAtest")) {
-                GiaConfig giaConfig = createGiaConfig(frontGenerator);
-                ParetoGIA paretoGIA = ParetoGIAFactory.createSolver(giaConfig, timeoutSec);
-                if (frontGenerator.contains("regionImplementation"))
-                    return paretoGIA.runOriginal(model, objectives, maximize, timeoutSec);
-                return paretoGIA.run(maximize, model, objectives);
-            }
-            switch (frontGenerator) {
-                case "ParetoDisjunctiveProgrammingRegSelImproAll":
-                    ParetoDisjunctiveProgramming paretoDisjunctiveProgrammingRegSelImprAll = new ParetoDisjunctiveProgramming();
-                    return paretoDisjunctiveProgrammingRegSelImprAll.run(model, objectives, maximize, timeoutSec, false);
-                case "ParetoDisjunctiveProgrammingTest":
-                    ParetoDisjunctiveProgramming paretoDisjunctiveProgramming = new ParetoDisjunctiveProgramming();
-                    return paretoDisjunctiveProgramming.run(model, objectives, maximize, timeoutSec, true);
-                case "ParetoDisjunctiveProgrammingNoLabel":
-                    ParetoDisjunctiveNoLabel paretoDisjunctiveProgrammingNoLabel = new ParetoDisjunctiveNoLabel();
-                    return paretoDisjunctiveProgrammingNoLabel.run(model, objectives, maximize, timeoutSec);
-                case "ParetoGavanelliGlobalConstraintNoEvolutionInfoTest":
-                    Pareto pareto = new Pareto();
-                    return pareto.run(model, objectives, maximize);
-                case "ParetoGavanelliGlobalConstraintTest":
-                    ParetoGavanelliFrontEvolutionInfo paretoGavanelliFrontEvolutionInfo = new ParetoGavanelliFrontEvolutionInfo();
-                    return paretoGavanelliFrontEvolutionInfo.run(model, objectives, maximize);
-                case "SaugmeconNoRTest":
-                    ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursive = new ParetoSaugmeconNoRecursive();
-                    return paretoSaugmeconNoRecursive.run(model, objectives, maximize, true, timeoutSec);
-                case "SaugmeconNoRTestReal":
-                    ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursiveReals = new ParetoSaugmeconNoRecursive();
-                    return paretoSaugmeconNoRecursiveReals.run(model, objectives, maximize, true, timeoutSec, true);
-                case "SaugmeconNoRFrontVerifyTest":
-                    ParetoSaugmeconNoRecursive paretoSaugmeconNoRecursiveFrontVerify = new ParetoSaugmeconNoRecursive();
-                    return paretoSaugmeconNoRecursiveFrontVerify.run(model, objectives, maximize, false, timeoutSec);
-                case "SaugmeconTest":
-                    ParetoSaugmecon paretoSaugmeconLex = new ParetoSaugmecon(true);
-                    return paretoSaugmeconLex.run(model, objectives, maximize, timeoutSec);
-                case "SaugmeconFrontVerifyTest":
-                    ParetoSaugmecon paretoSaugmecon = new ParetoSaugmecon(false);
-                    return paretoSaugmecon.run(model, objectives, maximize, timeoutSec);
-                case "SimpleOptGlobalConstraintTest":
-                    ParetoOptimizeSumGavanelliConstraint paretoOptimizeSumGavanelliConstraint = new ParetoOptimizeSumGavanelliConstraint();
-                    return paretoOptimizeSumGavanelliConstraint.run(model, objectives, maximize, timeoutSec);
-                default: {
-                    StrategyComponents components = getStrategyComponentsFromKeyword(frontGenerator);
-                    MocoStrategy strategy = new MocoStrategy(components);
-                    TimeCounter tc = new TimeCounter(model, 1000 * timeoutSec * TimeUtils.MILLISECONDS_IN_NANOSECONDS);
-                    ParetoSolutionDetails paretoSolutionDetails = strategy.execute(model, objectives, maximize, tc);
-                    return new Object[]{paretoSolutionDetails.getParetoFront(), paretoSolutionDetails.getSolverMeasures(), paretoSolutionDetails.isExhaustive()};
-                }
-            }
+            StrategyComponents components = getStrategyComponentsFromKeyword(frontGenerator);
+            MocoStrategy strategy = new MocoStrategy(components);
+            TimeCounter tc = new TimeCounter(model, 1000 * timeoutSec * TimeUtils.MILLISECONDS_IN_NANOSECONDS);
+            ParetoSolutionDetails paretoSolutionDetails = strategy.execute(model, objectives, maximize, tc);
+            return new Object[]{paretoSolutionDetails.getParetoFront(), paretoSolutionDetails.getSolverMeasures(), paretoSolutionDetails.isExhaustive()};
         });
     }
 
     private static StrategyComponents getStrategyComponentsFromKeyword(String keyword) {
         StrategyFactory strategyFactory = new StrategyFactory();
-        ArrayList<PreprocessingStrategy> preprocessingStrategies = new ArrayList<PreprocessingStrategy>();
+        ArrayList<PreprocessingStrategy> preprocessingStrategies = new ArrayList<>();
         switch (keyword) {
-            case "Gavanelli":
+            case "MOBAB-CP":
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
@@ -243,30 +160,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getFindSolution(FindSolutionType.GENERIC),
                         strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
                 );
-            case "SimpleOptGlobalConstraint":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.GENERIC),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
-                );
-            case "SimpleOptGlobalConstraintNoGoodSolution":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.GENERIC),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
-                );
-            case "Saugmecon":
+            case "SAUGMECON":
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
                 return new StrategyComponents(
                         strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
@@ -275,48 +169,7 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
                 );
-            case "SaugmeconUB":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON_CONSTRAIN_MAIN_OBJECTIVE_UB)
-                );
-            case "SaugmeconGlobal":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
-                );
-            case "SaugmeconGlobalIntermediate":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
-                );
-            case "SaugmeconGlobalIntermediateImproved":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.DISABLE_PARETO_MAXIMIZER_AFTER_FIRST_SOLUTION));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON_INTERMEDIATE),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
-                );
-            case "SaugmeconGlobalIntermediateImprovedUB":
+            case "PAUGMECON":
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.DISABLE_PARETO_MAXIMIZER_AFTER_FIRST_SOLUTION));
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
@@ -327,74 +180,6 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getFindSolution(FindSolutionType.SAUGMECON_INTERMEDIATE),
                         strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON_CONSTRAIN_MAIN_OBJECTIVE_UB)
                 );
-            case "SaugmeconGlobalIntermediateUB":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON_CONSTRAIN_MAIN_OBJECTIVE_UB)
-                );
-            case "SaugmeconGlobalIntermediateNoGoodsPareto":
-                // IMPORTANT: This combination does not wor for the moment. Pareto fails can be affected by constraints
-                // on the objectives, so it is not safe to add them as a nogood.
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.SAUGMECON));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.SAUGMECON),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
-                );
-            case "GIA_SumObj":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.GIA),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.GIA)
-                );
-            case "GIA_SumObjNoGoodPareto":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_PARETO_FAILS));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.GIA),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.GIA)
-                );
-            case "GIA_SumObjNoGoodAllFailsFirst":
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.USE_OBJECTIVE_MANAGER_FOR_OBJECTIVES));
-                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.NO_GOOD_ON_ALL_FAILS_FIRST_THEN_ONLY_PARETO));
-                return new StrategyComponents(
-                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
-                        preprocessingStrategies,
-                        strategyFactory.getObjectiveFunctionOrDefault(ObjectiveFunctionType.SUM),
-                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-                        strategyFactory.getFindSolution(FindSolutionType.GIA),
-                        strategyFactory.getUpdateRegion(UpdateRegionType.GIA)
-                );
-//            case "ParetoDisjunctiveProgramming":
-//                return new StrategyComponents(
-//                        StrategyFactory.getInitialRegion(InitialRegionType.WHOLEOBJECTIVE),
-//                        List.of(StrategyFactory.getPreprocessing(PreprocessingType.SAUGMECON)),
-//                        StrategyFactory.getSelectRegion(SelectRegionType.SINGLE),
-//                        StrategyFactory.getFindSolution(FindSolutionType.SOLVE),
-//                        StrategyFactory.getUpdateRegion(UpdateRegionType.SAUGMECON)
-//                );
             // Add more cases here as needed
             default:
                 if (keyword.startsWith("MocoFrameworkStrate-")) {
@@ -402,51 +187,6 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                 }
                 throw new IllegalArgumentException("Invalid front generator: " + keyword);
         }
-    }
-
-
-    private static Object[] runFrontStrategyWithPortfolio(ModelObjectivesVariables[] modelObjectivesVariables, String frontGenerator, boolean maximize, int timeoutSec) {
-        // todo the implementation of the portfolio is not finished, needs to be tested
-        System.out.println("Running portfolio is not implemented yet. Exiting.");
-        System.exit(1);
-
-        //        model.getSolver().limitTime(timeoutSec + "s");
-        if (frontGenerator.contains("GIA")){
-            GiaConfig giaConfig = createGiaConfig(frontGenerator);
-            ParetoGIA paretoGIA = ParetoGIAFactory.createSolver(giaConfig, timeoutSec);
-            return paretoGIA.runWithPortfolio(modelObjectivesVariables, maximize, timeoutSec);
-        }else{
-            throw new IllegalArgumentException("Invalid front generator: " + frontGenerator);
-        }
-    }
-
-    private static GiaConfig createGiaConfig(String frontGenerator){
-        GiaConfig giaConfig = new GiaConfig();
-        switch (frontGenerator) {
-            case "GIAtest":
-                break;
-            case "GIAtest_bounded":
-                giaConfig.setBounded(GiaConfig.BoundedType.DOMINATING_DOMINATES);
-                break;
-            case "GIAtest_boundedLazy":
-                giaConfig.setBounded(GiaConfig.BoundedType.LAZY_DOMINATING_DOMINATES);
-                break;
-            case "BiObjGIAtest_sparsity":
-                giaConfig.setCriteriaSelection(GiaConfig.CriteriaSelection.SPARSITY);
-                break;
-            case "BiObjGIAtest_sparsityBounded":
-                giaConfig.setCriteriaSelection(GiaConfig.CriteriaSelection.SPARSITY);
-                giaConfig.setBounded(GiaConfig.BoundedType.DOMINATING_DOMINATES);
-                break;
-            case "BiObjGIAtest_regionImplementation":
-                // todo this name has to be replaced, rigth now it acts as bi_objGIA_sparsity_bounded
-                giaConfig.setCriteriaSelection(GiaConfig.CriteriaSelection.SPARSITY);
-                giaConfig.setBounded(GiaConfig.BoundedType.DOMINATING_DOMINATES);
-                break;
-            default:
-                throw new UnsupportedOperationException("Front generator not supported: " + frontGenerator);
-        }
-        return giaConfig;
     }
 
     private static boolean checkIfStatsAreCumulative(String frontGenerator){
