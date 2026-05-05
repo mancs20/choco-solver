@@ -350,12 +350,12 @@ public class IntLinCombFactory {
                 return s.times(VARS[0], COEFFS[0], VARS[1]);
             }
         }
-        if (Operator.EQ == OPERATOR
-                && VariableUtils.allEnumerated(VARS)
-                && TuplesFactory.canBeTupled(Arrays.copyOf(VARS, VARS.length - 1))) {
-            return s.table(VARS, TuplesFactory.scalar(Arrays.copyOf(VARS, VARS.length - 1), Arrays.copyOf(COEFFS, COEFFS.length - 1),
-                    OPERATOR.toString(), VARS[VARS.length - 1], -COEFFS[COEFFS.length - 1], RESULT));
-        }
+//        if (Operator.EQ == OPERATOR
+//                && VariableUtils.allEnumerated(VARS)
+//                && TuplesFactory.canBeTupled(Arrays.copyOf(VARS, VARS.length - 1))) {
+//            return s.table(VARS, TuplesFactory.scalar(Arrays.copyOf(VARS, VARS.length - 1), Arrays.copyOf(COEFFS, COEFFS.length - 1),
+//                    OPERATOR.toString(), VARS[VARS.length - 1], -COEFFS[COEFFS.length - 1], RESULT));
+//        }
         int b = 0, e = VARS.length;
         IntVar[] tmpV = new IntVar[e];
         int[] tmpC = new int[e];
