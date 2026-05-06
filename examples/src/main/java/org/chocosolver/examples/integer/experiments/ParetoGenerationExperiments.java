@@ -24,20 +24,18 @@ import org.json.JSONObject;
 /**
  * This class is used to run experiments to generate Pareto fronts for a given model
  * The parameters are passed as command-line arguments
- * @version choco-solver-4.0.4
+ * @version choco-solver-5.0.0
  * Example usage: java ParetoGenerationExperiments <benchmark> <problem> <instancename> <instancePath> <solverSearchStrategy> <solverTimeoutSec> <frontGenerator> <threads>
- *     benchmark: the name of the benchmark to be used. (e.g. "augmecon2", "vOptLib")
- *     problem: the name of the problem to be used. (e.g. "ukp" (multiobjective unidimensional knapsack), "sims")
- *     instance: the name of the instance to be used. (e.g. "100u1" for augmecon2, "2KP50-1A" for vOptLib)
+ *     benchmark: is the benchmark name, e.g. "MOOLibrary" for "ukp" or "powa" for "NQUEENS" and when the instance files are ".fzn" files ("RCPSP" and "sims").
+ *     problem: the name of the problem to be used. (e.g. "ukp" (multiobjective unidimensional knapsack), "NQUEENS", "RCPSP", "sims_cost_clouds", "sims_cost_clouds_angle")
+ *     instance: the name of the instance to be used.
  *     instancePath: the path to the instance file
  *     solverSearchStrategy: the name of the solver search strategy to be used, for now it is "default" to represent "domOverWDegSearch"
  *     solverTimeoutSec: the maximum time in seconds that the solver will run
- *     frontGenerator: the name of the front generator to be used, it could be "GIA" (versions: GIA, GIA_bounded, GIA_boundedLazy, BiObjGIA_sparsity, BiObjGIA_sparsityBounded, BiObjGIA_regionImplementation),
- *     "MOBAB-CP", "SAUGMECON", "PAUGMECON"
- *     threads: the number of threads to be used, the default is 1
+ *     frontGenerator: the name of the front generator to be used, it could be: "MOBAB-CP", "SAUGMECON", "PAUGMECON"
  *
  *     Examples:
- *     MOOLibrary ukp KP_p-4_n-30_ins-2 </folder_instances/>KP_p-4_n-30_ins-2.dat default 3600 MOBAB-CP
+ *     MOOLibrary ukp KP_p-4_n-30_ins-2 benchmarks/ukp/KP_p-4_n-30_ins-2.dat default 3600 MOBAB-CP
  *
  */
 
