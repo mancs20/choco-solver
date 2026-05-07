@@ -1,8 +1,10 @@
 # PAUGMECON experiments
 
-This repository is a fork of the Choco solver used to implement PAUGMECON and run the experiments of the paper:
+This repository is a fork of the Choco solver used to implement the multi-objective algorithm PAUGMECON, which computes the complete Pareto front within a constraint solver.
 
-**Combining an $\epsilon$-constraint method with the Pareto global constraint**
+It also includes the benchmark instances used in the experiments of the following paper:
+
+**M. Combarro Simón, P. Talbot, and P. Bouvry. _Combining an ϵ-Constraint Method with the Pareto Global Constraint_. CP 2026.**
 
 The implementation is based on `choco-solver-5.0.0`.
 
