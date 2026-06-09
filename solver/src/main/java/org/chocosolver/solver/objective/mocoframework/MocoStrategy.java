@@ -41,6 +41,9 @@ public class MocoStrategy {
     }
 
     public ParetoSolutionDetails execute(Model model, IntVar[] objectives, boolean maximize, Criterion... stop) {
+        // uncomment for debugging, to see branch decisions and search progress. See choco documentation to verify this is still used
+//        model.getSolver().showDecisions();
+
         // add stop critera if any
         model.getSolver().addStopCriterion(stop);
         //convert to maximization problem

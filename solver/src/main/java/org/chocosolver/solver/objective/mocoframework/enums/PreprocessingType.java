@@ -1,6 +1,7 @@
 package org.chocosolver.solver.objective.mocoframework.enums;
 
 public enum PreprocessingType {
+    NO_PREPROCESSING,
     GAVANELLI,
     SAUGMECON,
     DISJUNCTIVE_ALG,

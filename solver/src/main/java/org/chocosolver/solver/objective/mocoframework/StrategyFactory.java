@@ -32,6 +32,9 @@ public class StrategyFactory {
     public PreprocessingStrategy getPreprocessing(PreprocessingType type) {
         PreprocessingStrategy strategy;
         switch (type) {
+            case NO_PREPROCESSING:
+                strategy = new NoPreprocess();
+                break;
             case GAVANELLI:
                 strategy = new GavanelliPrepro(false);
                 break;
@@ -137,6 +140,9 @@ public class StrategyFactory {
                 break;
             case DISJUNCTIVE:
                 strategy = new DisjunctiveUpdate();
+                break;
+            case LOCAL_CONSTRAINT:
+                strategy = new LocalPareto();
                 break;
             default:
                 throw new IllegalArgumentException("Unknown UpdateRegionType: " + type);

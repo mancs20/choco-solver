@@ -243,6 +243,15 @@ public class ParetoGenerationExperiments implements IMultiObjectiveManager {
                         strategyFactory.getFindSolution(FindSolutionType.GENERIC),
                         strategyFactory.getUpdateRegion(UpdateRegionType.GAVANELLI)
                 );
+            case "MOBAB-CP-local_cons":
+                preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.NO_PREPROCESSING));
+                return new StrategyComponents(
+                        strategyFactory.getInitialRegion(InitialRegionType.ENTIRE_OBJECTIVE_SPACE),
+                        preprocessingStrategies,
+                        strategyFactory.getSelectRegion(SelectRegionType.SINGLE),
+                        strategyFactory.getFindSolution(FindSolutionType.GENERIC),
+                        strategyFactory.getUpdateRegion(UpdateRegionType.LOCAL_CONSTRAINT)
+                );
             case "SimpleOptGlobalConstraint":
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.GAVANELLI));
                 preprocessingStrategies.add(strategyFactory.getPreprocessing(PreprocessingType.ADD_INTERMEDIATE_SOLUTIONS));
