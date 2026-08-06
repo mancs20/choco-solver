@@ -20,7 +20,7 @@ import org.chocosolver.solver.constraints.unary.Member;
 import org.chocosolver.solver.constraints.unary.NotMember;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.exception.SolverException;
-import org.chocosolver.solver.objective.ParetoMaximizer;
+import org.chocosolver.solver.objective.multiobjective.ParetoFrontAlgorithm;
 import org.chocosolver.solver.search.limits.ACounter;
 import org.chocosolver.solver.search.limits.SolutionCounter;
 import org.chocosolver.solver.search.measure.IMeasures;
@@ -46,6 +46,7 @@ import java.util.stream.StreamSupport;
  * @author Charles Prud'homme
  * @author Guillaume Lelouet
  * @author Dimitri Justeau-Allaire (dimitri.justeau@gmail.com)
+ * @author Manuel Combarro Simón (combarro87@gmail.com)
  * @since 25/04/2016.
  */
 public interface IResolutionHelper extends ISelf<Solver> {
@@ -467,7 +468,7 @@ public interface IResolutionHelper extends ISelf<Solver> {
      * <p>
      * <pre>
      * {@code
-     * ParetoMaximizer pareto = new ParetoMaximizer(maximize, objectives);
+     * ParetoMaximizer pareto = new ParetoMaximizer(objectives);
      * 	while (ref().solve()) {
      * 		pareto.onSolution();
      *    }
@@ -484,19 +485,22 @@ public interface IResolutionHelper extends ISelf<Solver> {
      * @return a list that contained the solutions found.
      */
     default List<Solution> findParetoFront(IntVar[] objectives, boolean maximize, Criterion... stop) {
-        ref().addStopCriterion(stop);
-        ref().getModel().clearObjective();
-        ParetoMaximizer pareto = new ParetoMaximizer(
-                Stream.of(objectives).map(o -> maximize ? o : ref().getModel().neg(o)).toArray(IntVar[]::new)
-        );
-        Constraint c = new Constraint("PARETO", pareto);
-        c.post();
-        while (ref().solve()) {
-            pareto.onSolution();
-        }
-        ref().removeStopCriterion(stop);
-        ref().getModel().unpost(c);
-        return pareto.getParetoFront();
+        return findParetoFront(objectives, maximize, ParetoFrontAlgorithm.MOBAB, stop);
+    }
+
+    /**
+     * Attempts to compute the Pareto front with the selected algorithm.
+     *
+     * @param objectives the array of variables to optimize
+     * @param maximize   set to <tt>true</tt> to solve a maximization problem, set to <tt>false</tt> to solve a minimization
+     *                   problem.
+     * @param algorithm algorithm used to compute the Pareto front
+     * @param stop       optional criteria to stop the search before finding all/best solution
+     * @return a list that contained the solutions found.
+     */
+    default List<Solution> findParetoFront(IntVar[] objectives, boolean maximize,
+                                           ParetoFrontAlgorithm algorithm, Criterion... stop) {
+        return algorithm.create().findParetoFront(ref(), objectives, maximize, stop);
     }
 
     /**

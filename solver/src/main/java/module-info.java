@@ -71,6 +71,7 @@ module org.chocosolver.solver {
     exports org.chocosolver.solver.expression.discrete.logical;
     exports org.chocosolver.solver.expression.discrete.relational;
     exports org.chocosolver.solver.objective;
+    exports org.chocosolver.solver.objective.multiobjective;
     exports org.chocosolver.solver.propagation;
     exports org.chocosolver.solver.search;
     exports org.chocosolver.solver.search.limits;
