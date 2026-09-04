@@ -19,22 +19,25 @@ import java.util.List;
  * Computes a Pareto front by posting the Pareto global constraint and
  * enumerating solutions until infeasibility.
  *
+ * <p>
+ * Based on "An Algorithm for Multi-Criteria Optimization in CSPs", M. Gavanelli (ECAI 2002).
+ * <p>
+ * See also <a href="https://doi.org/10.1007/978-3-642-40627-0_46">Multi-Objective Large Neighborhood Search</a>,
+ * P. Schaus and R. Hartert (CP 2013).
+ *
  * @author Manuel Combarro Simón (combarro87@gmail.com)
  */
 public final class MobabParetoFrontFinder extends ParetoFrontFinder {
 
     @Override
-    public List<Solution> findParetoFront(
+    protected List<Solution> findParetoFront(
             Solver solver,
             IntVar[] objectives,
-            boolean maximize,
             Criterion... stop
     ) {
         solver.addStopCriterion(stop);
         solver.getModel().clearObjective();
-        ParetoMaximizer pareto = new ParetoMaximizer(
-                normalizeObjectives(solver, objectives, maximize)
-        );
+        ParetoMaximizer pareto = new ParetoMaximizer(objectives);
         Constraint constraint = new Constraint("PARETO", pareto);
         constraint.post();
         while (solver.solve()) {

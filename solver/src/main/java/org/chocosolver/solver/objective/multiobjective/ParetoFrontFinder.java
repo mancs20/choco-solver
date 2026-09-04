@@ -30,18 +30,30 @@ public abstract class ParetoFrontFinder {
      * @param stop optional criteria stopping the search
      * @return the Pareto solutions found
      */
-    public abstract List<Solution> findParetoFront(
+    public final List<Solution> findParetoFront(
             Solver solver,
             IntVar[] objectives,
             boolean maximize,
             Criterion... stop
-    );
+    ) {
+        return findParetoFront(solver, convertToMaximization(solver, objectives, maximize), stop);
+    }
 
     /**
-     * Turns minimization objectives into their opposite views so that concrete
-     * algorithms can uniformly maximize every objective.
+     * Computes a Pareto front for objectives expressed as maximization objectives.
+     *
+     * @param solver solver used to perform the search
+     * @param objectives maximization objective variables
+     * @param stop optional criteria stopping the search
+     * @return the Pareto solutions found
      */
-    protected IntVar[] normalizeObjectives(Solver solver, IntVar[] objectives, boolean maximize) {
+    protected abstract List<Solution> findParetoFront(
+            Solver solver,
+            IntVar[] objectives,
+            Criterion... stop
+    );
+
+    private IntVar[] convertToMaximization(Solver solver, IntVar[] objectives, boolean maximize) {
         return Stream.of(objectives)
                 .map(objective -> maximize ? objective : solver.getModel().neg(objective))
                 .toArray(IntVar[]::new);

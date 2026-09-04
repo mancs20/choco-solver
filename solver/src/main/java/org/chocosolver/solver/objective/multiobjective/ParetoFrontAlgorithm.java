@@ -26,6 +26,20 @@ public enum ParetoFrontAlgorithm {
         public ParetoFrontFinder create() {
             return new MobabParetoFrontFinder();
         }
+    },
+
+    /**
+     * Multi-objective algorithm robust for problems with 2 and 3 objectives. Combines ideas of SAUGMECON
+     * (an epsilon-constraint method) with the Pareto global constraint.
+     * <p>
+     * Based on <a href="https://doi.org/10.4230/LIPIcs.CP.2026.14">Combining an ε-Constraint Method with the
+     * Pareto Global Constraint</a>, M. Combarro Simón, P. Talbot and P. Bouvry (CP 2026).
+     */
+    PAUGMECON {
+        @Override
+        public ParetoFrontFinder create() {
+            return new PaugmeconParetoFrontFinder();
+        }
     };
 
     /**

@@ -28,6 +28,7 @@ import java.util.List;
  * @author Charles Prud'homme
  * @author Jean-Guillaume Fages
  * @author Jani Simomaa
+ * @author Manuel Combarro Simón (combarro87@gmail.com)
  */
 public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolution {
 
@@ -36,8 +37,8 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
     //***********************************************************************************
 
     // Set of incomparable and Pareto-best solutions
-    private final List<Solution> paretoSolutions;
-    private final List<int[]> paretoFront;
+    private List<Solution> paretoSolutions;
+    private List<int[]> paretoFront;
 
     private final Model model;
 
@@ -47,6 +48,8 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
     // objective function
     private final IntVar[] objectives;
     private final int n;
+
+    private final boolean keepSimilarSolutions;
 
     //private final int[] vals;
 
@@ -66,7 +69,12 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
      *
      * @param objectives objective variables (must all be optimized in the same direction)
      */
-    public ParetoMaximizer(final IntVar[] objectives) {
+
+    public ParetoMaximizer(IntVar[] objectives) {
+        this(objectives, false);
+    }
+
+    public ParetoMaximizer(final IntVar[] objectives, boolean keepSimilarSolutions) {
         super(objectives, PropagatorPriority.QUADRATIC, false);
         this.paretoSolutions = new ArrayList<>();
         this.paretoFront = new ArrayList<>();
@@ -74,6 +82,7 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
         n = objectives.length;
         model = objectives[0].getModel();
         //vals = new int[n];
+        this.keepSimilarSolutions = keepSimilarSolutions;
     }
 
     //***********************************************************************************
@@ -85,6 +94,17 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
      */
     public List<Solution> getParetoFront() {
         return paretoSolutions;
+    }
+
+    /**
+     * Shares the archive maintained by this propagator with a resolution algorithm.
+     *
+     * @param solutions non-dominated solutions
+     * @param values objective values associated with the solutions
+     */
+    public void setParetoFront(List<Solution> solutions, List<int[]> values) {
+        this.paretoSolutions = solutions;
+        this.paretoFront = values;
     }
 
     @Override
@@ -146,7 +166,7 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
             for (int[] sol : paretoFront) {
                 int dominates = dominates(sol, dominatedPoint, i);
                 if (dominates > 0) {
-                    int currentPoint = dominates == 1 ? sol[i] : sol[i] + 1;
+                    int currentPoint = keepSimilarSolutions && dominates == 1 ? sol[i] : sol[i] + 1;
                     if (tightestPoint < currentPoint) {
                         tightestPoint = currentPoint;
                     }
@@ -186,7 +206,7 @@ public class ParetoMaximizer extends Propagator<IntVar> implements IMonitorSolut
      * @return an int representing the fact that a dominates b
      */
     private int dominates(int[] a, int[] b, int i) {
-        int dominates = 0;
+        int dominates = keepSimilarSolutions ? 0 : 1;
         for (int j = 0; j < objectives.length; j++) {
             if (a[j] < b[j]) return 0;
             if (a[j] > b[j]) {
