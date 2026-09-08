@@ -14,15 +14,23 @@ import org.chocosolver.solver.search.loop.monitors.IMonitorSolution;
 import org.chocosolver.solver.search.SearchState;
 import org.chocosolver.solver.search.limits.SolutionCounter;
 import org.chocosolver.solver.search.strategy.Search;
+import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Tests for the PAUGMECON Pareto-front algorithm.
@@ -30,6 +38,8 @@ import java.util.Set;
  * @author Manuel Combarro Simón (combarro87@gmail.com)
  */
 public class PaugmeconParetoFrontFinderTest {
+
+    private static final Pattern INTEGER = Pattern.compile("-?\\d+");
 
     @Test(groups = "1s", timeOut = 60000)
     public void testTwoObjectives() {
@@ -116,7 +126,6 @@ public class PaugmeconParetoFrontFinderTest {
         Assert.assertFalse(front.contains(null));
     }
 
-    // todo here check the number of infeasible searches or something like that in the stats, maybe debug because now we cannot access to the accumulative stats, ask that to Charles,also the stats after reset, and knapsack.
     /**
      * Uses the objective vectors from the SAUGMECON example. The example includes grid points that can be skipped
      * because they are infeasible or already covered by a solution obtained for a previous epsilon vector.
@@ -201,6 +210,40 @@ public class PaugmeconParetoFrontFinderTest {
                 "Unexpected epsilon values at the start of the grid searches");
         Assert.assertEquals(finder.getCurrentEpsilon(), new int[]{1, 6},
                 "The final epsilon should violate the loop condition");
+    }
+
+    @Test(groups = "1s", timeOut = 60000)
+    public void testSimilarSolutionsAreNotFound() {
+        Model model = new Model();
+        IntVar a = model.intVar("a", 0, 2);
+        IntVar b = model.intVar("b", 0, 2);
+        IntVar c = model.intVar("c", 0, 2);
+        IntVar d = model.intVar("d", 0, 2);
+        model.sum(new IntVar[]{a, b, c, d}, "<=", 2).post();
+
+        IntVar firstObjective = model.intVar("a+b", 0, 2);
+        IntVar secondObjective = model.intVar("c+d", 0, 2);
+        model.sum(new IntVar[]{a, b}, "=", firstObjective).post();
+        model.sum(new IntVar[]{c, d}, "=", secondObjective).post();
+
+        List<String> solutionsFound = new ArrayList<>();
+        model.getSolver().plugMonitor((IMonitorSolution) () ->
+                solutionsFound.add(currentPoint(firstObjective, secondObjective))
+        );
+        model.getSolver().setSearch(Search.inputOrderLBSearch(
+                a, b, c, d, firstObjective, secondObjective
+        ));
+
+        model.getSolver().findParetoFront(new IntVar[]{firstObjective, secondObjective}, true,
+                ParetoFrontAlgorithm.PAUGMECON
+        );
+
+        for (int i = 0; i < solutionsFound.size(); i++) {
+            for (int j = i+1; j < solutionsFound.size(); j++) {
+                Assert.assertNotEquals(solutionsFound.get(i), solutionsFound.get(j),
+                        "Found duplicate solution: " + solutionsFound.get(i));
+            }
+        }
     }
 
     @Test(groups = "1s", timeOut = 60000)
@@ -304,6 +347,164 @@ public class PaugmeconParetoFrontFinderTest {
         Assert.assertNull(model.getObjective());
     }
 
+    @DataProvider(name = "knapsackInstances")
+    public Object[][] knapsackInstances() {
+        return new Object[][]{
+                {"KP_p-5_n-10_ins-10.dat"},
+                {"KP_p-5_n-10_ins-4.dat"},
+                {"KP_p-5_n-10_ins-5.dat"},
+                {"KP_p-5_n-10_ins-6.dat"},
+                {"KP_p-5_n-10_ins-8.dat"}, // this instance fail with the current knapsack global constraint
+                {"KP_p-5_n-10_ins-9.dat"},
+                {"KP_p-5_n-20_ins-2.dat"},
+                {"KP_p-5_n-20_ins-7.dat"}
+        };
+    }
+
+    @Test(dataProvider = "knapsackInstances")
+    public void testPaugmeconMatchesMobabOnKnapsack(String instanceFile) throws IOException {
+        KnapsackInstance instance = readKnapsackInstance(instanceFile);
+        ParetoRun mobab = runKnapsack(instanceFile, instance, ParetoFrontAlgorithm.MOBAB);
+        ParetoRun paugmecon = runKnapsack(instanceFile, instance, ParetoFrontAlgorithm.PAUGMECON);
+
+        if (mobab.failure != null || paugmecon.failure != null) {
+            RuntimeException failure = paugmecon.failure != null ? paugmecon.failure : mobab.failure;
+            Assert.fail(comparisonReport(instanceFile, mobab, paugmecon), failure);
+        }
+        Set<String> onlyMobab = new TreeSet<>(mobab.front);
+        onlyMobab.removeAll(paugmecon.front);
+        Set<String> onlyPaugmecon = new TreeSet<>(paugmecon.front);
+        onlyPaugmecon.removeAll(mobab.front);
+        if (!onlyMobab.isEmpty() || !onlyPaugmecon.isEmpty()) {
+            Assert.fail(comparisonReport(instanceFile, mobab, paugmecon)
+                    + "\nOnly in MOBAB: " + onlyMobab
+                    + "\nOnly in PAUGMECON: " + onlyPaugmecon);
+        }
+    }
+
+    private ParetoRun runKnapsack(String instanceFile, KnapsackInstance instance,
+                                  ParetoFrontAlgorithm algorithm) {
+        KnapsackModel knapsack = buildKnapsackModel(instanceFile, instance, algorithm);
+        try {
+            List<Solution> solutions = knapsack.model.getSolver().findParetoFront(
+                    knapsack.objectives, true, algorithm
+            );
+            Assert.assertFalse(solutions.isEmpty(),
+                    algorithm + " returned no solution for " + instanceFile);
+            for (Solution solution : solutions) {
+                assertKnapsackSolution(instanceFile, instance, knapsack, solution);
+            }
+            return new ParetoRun(
+                    new TreeSet<>(points(solutions, knapsack.objectives)),
+                    knapsack.model.getSolver().getSearchState(),
+                    null
+            );
+        } catch (RuntimeException failure) {
+            return new ParetoRun(
+                    new TreeSet<>(), knapsack.model.getSolver().getSearchState(), failure
+            );
+        }
+    }
+
+    private KnapsackModel buildKnapsackModel(String instanceFile, KnapsackInstance instance,
+                                             ParetoFrontAlgorithm algorithm) {
+        Model model = new Model(instanceFile + "-" + algorithm);
+        BoolVar[] selected = model.boolVarArray("selected", instance.itemCount);
+        IntVar totalWeight = model.intVar("totalWeight", 0, instance.capacity);
+        IntVar[] objectives = new IntVar[instance.objectiveCount];
+
+        for (int objective = 0; objective < instance.objectiveCount; objective++) {
+            int upperBound = Arrays.stream(instance.profits[objective]).sum();
+            objectives[objective] = model.intVar("objective_" + objective, 0, upperBound);
+            model.knapsack(
+                    selected,
+                    totalWeight,
+                    objectives[objective],
+                    instance.weights,
+                    instance.profits[objective]
+            ).post();
+        }
+
+        model.getSolver().setSearch(
+                Search.domOverWDegSearch(selected),
+                Search.inputOrderLBSearch(objectives)
+        );
+        return new KnapsackModel(model, selected, objectives);
+    }
+
+    private void assertKnapsackSolution(String instanceFile, KnapsackInstance instance,
+                                        KnapsackModel knapsack, Solution solution) {
+        int weight = 0;
+        int[] profits = new int[instance.objectiveCount];
+
+        for (int item = 0; item < instance.itemCount; item++) {
+            if (solution.getIntVal(knapsack.selected[item]) == 1) {
+                weight += instance.weights[item];
+                for (int objective = 0; objective < instance.objectiveCount; objective++) {
+                    profits[objective] += instance.profits[objective][item];
+                }
+            }
+        }
+
+        Assert.assertTrue(weight <= instance.capacity,
+                "Capacity exceeded in " + instanceFile + ": " + weight + " > " + instance.capacity);
+        for (int objective = 0; objective < instance.objectiveCount; objective++) {
+            Assert.assertEquals(solution.getIntVal(knapsack.objectives[objective]), profits[objective],
+                    "Incorrect objective " + objective + " in " + instanceFile);
+        }
+    }
+
+    private KnapsackInstance readKnapsackInstance(String instanceFile) throws IOException {
+        String resource = "/org/chocosolver/solver/objective/multiobjective/" + instanceFile;
+        try (InputStream stream = getClass().getResourceAsStream(resource)) {
+            Assert.assertNotNull(stream, "Missing test resource " + resource);
+            Matcher matcher = INTEGER.matcher(new String(stream.readAllBytes(), StandardCharsets.UTF_8));
+            List<Integer> values = new ArrayList<>();
+            while (matcher.find()) {
+                values.add(Integer.parseInt(matcher.group()));
+            }
+            return parseKnapsackInstance(instanceFile, values);
+        }
+    }
+
+    private KnapsackInstance parseKnapsackInstance(String instanceFile, List<Integer> values) {
+        Assert.assertTrue(values.size() >= 3, "Invalid knapsack instance " + instanceFile);
+        int cursor = 0;
+        int objectiveCount = values.get(cursor++);
+        int itemCount = values.get(cursor++);
+        int capacity = values.get(cursor++);
+        int expectedValueCount = 3 + objectiveCount * itemCount + itemCount;
+        Assert.assertEquals(values.size(), expectedValueCount,
+                "Unexpected number of values in " + instanceFile);
+
+        int[][] profits = new int[objectiveCount][itemCount];
+        for (int objective = 0; objective < objectiveCount; objective++) {
+            for (int item = 0; item < itemCount; item++) {
+                profits[objective][item] = values.get(cursor++);
+            }
+        }
+
+        int[] weights = new int[itemCount];
+        for (int item = 0; item < itemCount; item++) {
+            weights[item] = values.get(cursor++);
+        }
+        return new KnapsackInstance(objectiveCount, itemCount, capacity, profits, weights);
+    }
+
+    private String comparisonReport(String instanceFile, ParetoRun mobab, ParetoRun paugmecon) {
+        return "Pareto-front comparison for " + instanceFile
+                + "\nMOBAB [" + mobab.state + "]: " + describeFront(mobab)
+                + "\nPAUGMECON [" + paugmecon.state + "]: " + describeFront(paugmecon);
+    }
+
+    private String describeFront(ParetoRun run) {
+        if (run.failure != null) {
+            return "unavailable (" + run.failure.getClass().getSimpleName()
+                    + ": " + run.failure.getMessage() + ')';
+        }
+        return run.front.toString();
+    }
+
     private void assertFrontEquals(List<Solution> front, Set<String> expected, IntVar... objectives) {
         Assert.assertFalse(front.contains(null), "The returned front contains a null solution");
 
@@ -345,6 +546,18 @@ public class PaugmeconParetoFrontFinderTest {
             point.append(objective.getValue());
         }
         return point.toString();
+    }
+
+    private record KnapsackInstance(int objectiveCount, int itemCount, int capacity, int[][] profits, int[] weights) {
+
+    }
+
+    private record KnapsackModel(Model model, BoolVar[] selected, IntVar[] objectives) {
+
+    }
+
+    private record ParetoRun(Set<String> front, SearchState state, RuntimeException failure) {
+
     }
 
 }

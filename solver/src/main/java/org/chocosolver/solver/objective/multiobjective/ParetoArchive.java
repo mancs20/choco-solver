@@ -20,6 +20,11 @@ import java.util.List;
  * The archive can also distinguish certified Pareto-optimal solutions from
  * intermediate non-dominated solutions. Certified solutions are kept at the
  * beginning of the archive.
+ * <p>
+ * Candidates passed to {@link #addIntermediateSolution()} or {@link #addSolution(Solution)}
+ * must already be known not to be dominated by an archived solution. These methods remove
+ * existing solutions dominated by the candidate, but do not reject a candidate dominated
+ * by an existing solution. Certified solutions are added without a dominance comparison.
  *
  * @author Manuel Combarro Simón (combarro87@gmail.com)
  */
@@ -48,6 +53,7 @@ public final class ParetoArchive {
     /**
      * Add the last solution obtained to the archive. Archived intermediate solutions dominated by the new solution are
      * removed.
+     * The current solution must not be dominated by an archived solution.
      *
      * @return the recorded solution, or {@code null} when it was already present and similar solutions are not saved.
      */
@@ -66,6 +72,7 @@ public final class ParetoArchive {
     /**
      * Adds an already-recorded solution to the archive.
      * Solutions dominated by it are removed.
+     * The supplied solution must not be dominated by an archived solution.
      *
      * @param solution solution to add
      * @return {@code true} if the solution was added, or {@code false} if an
@@ -83,6 +90,7 @@ public final class ParetoArchive {
 
     /**
      * Adds a solution known to be Pareto optimal.
+     * No dominance comparison is required because the solution is already certified.
      *
      * @param solution solution to add
      */
@@ -92,6 +100,7 @@ public final class ParetoArchive {
 
     /**
      * Adds a solution known to be Pareto optimal.
+     * No dominance comparison is required because the solution is already certified.
      *
      * @param solution solution to add
      * @param values objective values associated with {@code solution}
@@ -102,6 +111,11 @@ public final class ParetoArchive {
             swap(certifiedSize, paretoSolutions.size() - 1);
             certifiedSize++;
         }
+    }
+
+    private void add(Solution solution, int[] values) {
+        paretoSolutions.add(solution);
+        paretoFront.add(values);
     }
 
     /**
@@ -150,7 +164,7 @@ public final class ParetoArchive {
      * {@code false} if it is equivalent to an existing solution and should not be added to the archive.
      */
     private boolean checkDominanceVsExistingSolutions(int[] newSolObjVals) {
-        for (int i = paretoFront.size() - 1; i >= 0; i--) {
+        for (int i = paretoFront.size() - 1; i >= certifiedSize; i--) {
             int relation = dominanceCheck(newSolObjVals, paretoFront.get(i));
             if (relation == 0) {
                 return false;
@@ -204,11 +218,6 @@ public final class ParetoArchive {
         if (solution != null) {
             solutionPool.add(solution);
         }
-    }
-
-    private void add(Solution solution, int[] values) {
-        paretoSolutions.add(solution);
-        paretoFront.add(values);
     }
 
     public int[] removeAndSwapWithLast(int idx) {

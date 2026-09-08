@@ -44,11 +44,11 @@ public final class PaugmeconParetoFrontFinder extends ParetoFrontFinder {
     @Override
     protected List<Solution> findParetoFront(
             Solver solver,
-            IntVar[] objectives,
+            IntVar[] unOrderedObjectives,
             Criterion... stop
     ) {
         this.solver = solver;
-        this.objectives = orderObjectives(objectives);
+        this.objectives = orderObjectives(unOrderedObjectives);
         this.posByValsRef = new IdentityHashMap<>();
         this.bestLexFound = new int[this.objectives.length];
         this.epsilon = null;
